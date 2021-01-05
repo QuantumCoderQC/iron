@@ -443,7 +443,76 @@ class BoneAnimation extends Animation {
 		return 0.0;
 	}
 
-	public function solveIK(effector: TObj, goal: Vec4, precission = 0.1, maxIterations = 6) {
+	public function getAbsWorldMat(bone : TObj) : Mat4
+	{
+		var worldMat = getWorldMat(bone);
+		return null;
+	}
+
+	public function solveIK(effector: TObj, goal: Vec4, precission = 0.1, maxIterations = 6, chainLenght: Int = 0, pole: Vec4 = null)
+	{
+		//trace(object.parent.transform.world.getLoc());
+		var bones: Array<TObj> = [];
+		var lengths: Array<FastFloat> = [];
+		var start = effector;
+
+		if (chainLenght < 1) chainLenght = 100;
+
+		bones.push(start);
+		lengths.push(getBoneLen(start));
+
+		while (start.parent != null){
+
+			if(bones.length > chainLenght - 1) break;
+			bones.push(start.parent);
+			lengths.push(getBoneLen(start.parent));
+			start = start.parent;	
+		}
+
+		start = bones[bones.length-1]; //Root Bone
+
+		var invMat: Mat4 = Mat4.identity();
+		var rootWorldMat = getWorldMat(start).clone();//World matrix of root bone
+		var armatureMat = object.transform.world.clone();
+		invMat.getInverse(armatureMat);
+		rootWorldMat.multmat(invMat);
+
+		rootWorldMat = armatureMat.clone();
+
+		var startLoc = rootWorldMat.getLoc(); //Root Location
+		trace(startLoc);
+
+		var dist = Vec4.distance(goal,startLoc); //Distance from Root to Goal
+
+		// Bones length
+		var totalLength: FastFloat = 0.0;
+		for (l in lengths) totalLength += l;
+
+		trace(totalLength);
+
+		// Unreachable distance
+		if (dist > totalLength) {
+
+			var newLook = goal.sub(rootWorldMat.getLoc());//vector from root to goal
+			newLook.normalize();//Normalize
+			var newQuat = new Quat();
+			newQuat = newQuat.fromTo(rootWorldMat.look(), newLook);//Quat by which root must be rotated
+			trace(newQuat);
+			var invMat2: Mat4 = Mat4.identity(); 
+			
+			invMat2.getInverse(rootWorldMat);
+			armatureMat.multmat(invMat2);
+			armatureMat.applyQuat(newQuat);
+			getBoneMat(start).setFrom(armatureMat);
+
+			return;
+		}
+	
+		return;
+
+	}
+
+	public function solveIK_old(effector: TObj, goal: Vec4, precission = 0.1, maxIterations = 6) {
 		// FABRIK - Forward and backward reaching inverse kinematics solver
 		var bones: Array<TObj> = [];
 		var lengths: Array<FastFloat> = [];
