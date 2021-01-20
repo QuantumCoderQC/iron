@@ -216,7 +216,7 @@ class BoneAnimation extends Animation {
 		if (lastBones != skeletonBones) return;
 
 		for (i in 0...skeletonBones.length) {
-			updateAnimSampled(skeletonBones[i].anim, skeletonMats[i]);
+			if(! skeletonBones[i].is_IK_FK) updateAnimSampled(skeletonBones[i].anim, skeletonMats[i]);
 		}
 		if (blendTime > 0 && skeletonBonesBlend != null) {
 			for (b in skeletonBonesBlend) {
@@ -454,62 +454,146 @@ class BoneAnimation extends Animation {
 		//trace(object.parent.transform.world.getLoc());
 		var bones: Array<TObj> = [];
 		var lengths: Array<FastFloat> = [];
-		var start = effector;
+		var tip = effector;
+
+		var tempLoc = new Vec4();
+		var tempRot = new Quat();
+		var tempScl = new Vec4();
 
 		if (chainLenght < 1) chainLenght = 100;
 
-		bones.push(start);
-		lengths.push(getBoneLen(start));
+		bones.push(tip);
+		lengths.push(getBoneLen(tip));
+		var root = tip;
 
-		while (start.parent != null){
+		while (root.parent != null){
 
 			if(bones.length > chainLenght - 1) break;
-			bones.push(start.parent);
-			lengths.push(getBoneLen(start.parent));
-			start = start.parent;	
+			bones.push(root.parent);
+			lengths.push(getBoneLen(root.parent));
+			root = root.parent;	
 		}
 
-		start = bones[bones.length-1]; //Root Bone
+		root = bones[bones.length-1]; //Root Bone
 
 		var invMat: Mat4 = Mat4.identity();
-		var rootWorldMat = getWorldMat(start).clone();//World matrix of root bone
-		var armatureMat = object.transform.world.clone();
-		invMat.getInverse(armatureMat);
-		rootWorldMat.multmat(invMat);
+		var rootWorldMat = getWorldMat(root).clone();//World matrix of root bone
+		var armatureMat = object.transform.world.clone();//World matrix of Armature
 
-		rootWorldMat = armatureMat.clone();
+		var goalMat: Mat4 = Mat4.identity();
+		goalMat.setLoc(goal);// Location matrix of goal
 
-		var startLoc = rootWorldMat.getLoc(); //Root Location
-		trace(startLoc);
+		invMat.getInverse(armatureMat);// Inverse of Armature Mat
+		goalMat.multmat(invMat);// Goal mat in armature space
+		
+		var rootLoc = rootWorldMat.getLoc(); //Root Location
 
-		var dist = Vec4.distance(goal,startLoc); //Distance from Root to Goal
+		var dist = Vec4.distance(goalMat.getLoc(),rootLoc); //Distance from Root to Goal
 
 		// Bones length
 		var totalLength: FastFloat = 0.0;
 		for (l in lengths) totalLength += l;
 
-		trace(totalLength);
-
 		// Unreachable distance
 		if (dist > totalLength) {
 
-			var newLook = goal.sub(rootWorldMat.getLoc());//vector from root to goal
+			var newLook = goalMat.getLoc().sub(rootWorldMat.getLoc());//vector from root to goal
 			newLook.normalize();//Normalize
 			var newQuat = new Quat();
 			newQuat = newQuat.fromTo(rootWorldMat.look(), newLook);//Quat by which root must be rotated
-			trace(newQuat);
 			var invMat2: Mat4 = Mat4.identity(); 
 			
-			invMat2.getInverse(rootWorldMat);
-			armatureMat.multmat(invMat2);
-			armatureMat.applyQuat(newQuat);
-			getBoneMat(start).setFrom(armatureMat);
+			invMat2.getInverse(armatureMat);
+			var tempLoc = rootWorldMat.getLoc();
+			rootWorldMat.setLoc(new Vec4());
+			rootWorldMat.applyQuat(newQuat);
+			rootWorldMat.setLoc(tempLoc);
+			setBoneMatFromWorldMat(rootWorldMat, root);
+			//getBoneMat(root).applyQuat(newQuat);
+			
+			for(i in 0...bones.length - 1)
+			{
+				getBoneMat(bones[i]).decompose(tempLoc, tempRot, tempScl);
+				getBoneMat(bones[i]).compose(tempLoc, new Quat(), tempScl);
+			}
+
+			
 
 			return;
 		}
 	
 		return;
 
+	}
+
+	public function getSetFast(tip:TObj, chainLength: Int) {
+
+		var wmArray = getWorldMatsFast(tip, chainLength);
+		setBoneMatsFast(wmArray, tip);
+		
+	}
+
+	public function getWorldMatsFast(tip: TObj, chainLength: Int): Array<Mat4> {
+
+		var wmArray: Array<Mat4> = [];
+		var bones: Array<TObj> = [];
+		var tempMat: Mat4 = Mat4.identity();
+
+		var root = tip;
+		var numP = chainLength - 1;
+		while(root.parent != null)
+		{
+			if(numP < 1 ) break;
+			bones.push(root);
+			root = root.parent;
+			numP--;
+		}
+
+		wm.setFrom(getWorldMat(root));
+		wmArray.push(wm.clone());
+
+		for(j in 0...bones.length){
+
+			tempMat.setFrom(getBoneMat(bones[bones.length - 1 - j]));
+			tempMat.multmat(wm);
+			wm.setFrom(tempMat);
+			wmArray.push(tempMat.clone());
+		}
+
+		return wmArray;
+	}
+
+	function setBoneMatFromWorldMat(wm: Mat4, bone: TObj) {
+
+		var bm:Mat4 = Mat4.identity();
+		var invMat:Mat4 = Mat4.identity();
+		var bones:Array<TObj> = [];
+		var pBone = bone;
+		while(pBone.parent != null)
+		{
+			bones.push(pBone.parent);
+			pBone = pBone.parent;
+		}
+
+		for(i in 0...bones.length)
+		{
+			var x = bones.length - 1;
+			invMat.getInverse(getBoneMat(bones[x - i]));
+			wm.multmat(invMat);
+		}
+
+		getBoneMat(bone).setFrom(wm);
+		
+	}
+
+	function setBoneMatsFast(wmArray: Array<Mat4>, tip: TObj) {
+
+		for(i in 0...wmArray.length)
+		{
+			setBoneMatFromWorldMat(wmArray[wmArray.length - 1 - i], tip);
+			tip = tip.parent;
+		}
+		
 	}
 
 	public function solveIK_old(effector: TObj, goal: Vec4, precission = 0.1, maxIterations = 6) {
