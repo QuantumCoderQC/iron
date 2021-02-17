@@ -454,6 +454,7 @@ class BoneAnimation extends Animation {
 		//trace(object.parent.transform.world.getLoc());
 		var bones: Array<TObj> = [];
 		var lengths: Array<FastFloat> = [];
+		var boneWorldMats: Array<Mat4>;
 		var tip = effector;
 
 		var tempLoc = new Vec4();
@@ -517,11 +518,116 @@ class BoneAnimation extends Animation {
 				getBoneMat(bones[i]).compose(tempLoc, new Quat(), tempScl);
 			}
 
-			
-
 			return;
 		}
-	
+
+		boneWorldMats = getWorldMatsFast(effector, bones.length + 1);
+		var vec = new Vec4();
+		var vec2 = new Vec4();
+
+		//Solvw IK new
+		/* for(i in 0...1)
+		{
+			//BackwardAlgorithm
+			var l = lengths.length;
+			var b = boneWorldMats.length;
+
+			vec.setFrom(goalMat.getLoc());
+			vec.sub(boneWorldMats[b - 1].getLoc());
+			vec.normalize();
+			vec.mult(lengths[0]);
+			boneWorldMats[b - 1].setLoc(vec);
+			trace("Goal Loc :");
+			trace(goalMat.getLoc());
+			trace("Bone World mat");
+			trace(boneWorldMats[b - 1].getLoc());
+
+
+			trace("Backward");
+			for (j in 1...b) {
+				trace(j);
+				vec.setFrom(boneWorldMats[b - 1 - j].getLoc());
+				vec2.setFrom(boneWorldMats[b - 1 - j].getLoc());
+				vec.sub(boneWorldMats[b - j].getLoc());
+				vec.normalize();
+				vec.mult(lengths[j]);
+				vec2.add(vec);
+				boneWorldMats[b - 1 - j].setLoc(vec2);
+			}
+			trace("Backward done");
+
+			//ForwardAlgorithm
+			boneWorldMats[0].setLoc(rootLoc);
+			trace("Forward");
+			for (j in 1...b) {
+				trace(j);
+				vec.setFrom(boneWorldMats[j].getLoc());
+				vec2.setFrom(boneWorldMats[j].getLoc());
+				vec.sub(boneWorldMats[j - 1].getLoc());
+				vec.normalize();
+				trace("Noramlized");
+				trace(l - j);
+				vec.mult(lengths[l - 1 - j]);
+				vec2.add(vec);
+				boneWorldMats[j].setLoc(vec2);
+				trace("Forward Done");
+			} 
+
+			
+			//if (Vec4.distance(boneWorldMats[b].getLoc(), goal) <= precission) break;
+
+		} */
+
+		// Solve IK Old
+		var vec = new Vec4();
+		var locs: Array<Vec4> = [];
+		for (b in bones) locs.push(getWorldMat(b).getLoc());
+
+		for (i in 0...maxIterations) {
+			// Backward
+			vec.setFrom(goal);
+			vec.sub(locs[0]);
+			vec.normalize();
+			vec.mult(lengths[0]);
+			locs[0].setFrom(goal);
+			locs[0].sub(vec);
+			for (j in 1...locs.length) {
+				vec.setFrom(locs[j]);
+				vec.sub(locs[j - 1]);
+				vec.normalize();
+				vec.mult(lengths[j]);
+				locs[j].setFrom(locs[j - 1]);
+				locs[j].add(vec);
+			}
+			// Forward
+			locs[locs.length - 1].setFrom(goalMat.getLoc());
+			var l = locs.length;
+			for (j in 1...l) {
+				vec.setFrom(locs[l - j - 1]);
+				vec.sub(locs[l - j]);
+				vec.normalize();
+				vec.mult(lengths[l - j]);
+				locs[l - j - 1].setFrom(locs[l - j]);
+				locs[l - j - 1].add(vec);
+			}
+
+		}
+
+		for (b in bones) applyParent[getBoneIndex(b)] = false;
+
+		for (i in 0...bones.length) {
+			var m = getBoneMat(bones[i]);
+			m.decompose(vpos, q1, vscl);
+			var l1 = i == 0 ? locs[i] : locs[i - 1];
+			var l2 = i == 0 ? locs[i + 1] : locs[i];
+			v2.setFrom(l1).sub(l2).normalize();
+			q1.fromTo(v1, v2);
+			vec.setFrom(locs[i]);
+			m.compose(vec, q1, vscl);
+		}
+
+		//setBoneMatsFast(boneWorldMats, tip);
+		
 		return;
 
 	}
@@ -533,6 +639,7 @@ class BoneAnimation extends Animation {
 		
 	}
 
+	//root at 0 in mats
 	public function getWorldMatsFast(tip: TObj, chainLength: Int): Array<Mat4> {
 
 		var wmArray: Array<Mat4> = [];
