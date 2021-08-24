@@ -96,13 +96,32 @@ class Animation {
 		}
 	}
 
+	public function updateNew(delta: FastFloat, actionParam: Animparams){
+
+		if (actionParam.paused || actionParam.speed == 0.0) return;
+		
+		actionParam.setTimeOnly(actionParam.time + delta * actionParam.speed);
+	}
+
 	function isTrackEnd(track: TTrack): Bool {
 		return speed > 0 ?
 			frameIndex >= track.frames.length - 1 :
 			frameIndex <= 0;
 	}
 
+	function isTrackEndNew(track: TTrack, frameIndex: Int, speed: FastFloat): Bool {
+		return speed > 0 ?
+			frameIndex >= track.frames.length - 1 :
+			frameIndex <= 0;
+	}
+
 	inline function checkFrameIndex(frameValues: Uint32Array): Bool {
+		return speed > 0 ?
+			((frameIndex + 1) < frameValues.length && time > frameValues[frameIndex + 1] * frameTime) :
+			((frameIndex - 1) > -1 && time < frameValues[frameIndex - 1] * frameTime);
+	}
+
+	inline function checkFrameIndexNew(frameValues: Uint32Array, time: FastFloat, frameIndex: Int, speed: FastFloat): Bool {
 		return speed > 0 ?
 			((frameIndex + 1) < frameValues.length && time > frameValues[frameIndex + 1] * frameTime) :
 			((frameIndex - 1) > -1 && time < frameValues[frameIndex - 1] * frameTime);
@@ -148,6 +167,56 @@ class Animation {
 		}
 	}
 
+	function updateTrackNew(anim: TAnimation, actionParam: Animparams) {		
+
+		var time = actionParam.time;
+		var frameIndex = actionParam.offset;
+		var speed = actionParam.speed;
+
+		var track = anim.tracks[0];
+
+		//trace(frameIndex);
+		if (frameIndex == -1) {
+			frameIndex = speed > 0 ? 0 : track.frames.length - 1;
+			time = track.frames[frameIndex] * frameTime;
+		}
+
+		// Move keyframe
+		var sign = speed > 0 ? 1 : -1;
+		while (checkFrameIndexNew(track.frames, time, frameIndex, speed)) frameIndex += sign;
+
+/* 		trace(sign);
+		trace(frameIndex); */
+
+		// Marker events
+		if (markerEvents != null && anim.marker_names != null && frameIndex != lastFrameIndex) {
+			for (i in 0...anim.marker_frames.length) {
+				if (frameIndex == anim.marker_frames[i]) {
+					var ar = markerEvents.get(anim.marker_names[i]);
+					for (f in ar) f();
+				}
+			}
+			lastFrameIndex = frameIndex;
+		}
+
+		// End of track
+		if (isTrackEndNew(track, frameIndex, speed)) {
+			if (actionParam.loop) {
+				frameIndex = speed > 0 ? 0 : track.frames.length - 1;
+				time = track.frames[frameIndex] * frameTime;
+			}
+			else {
+				frameIndex -= sign;
+				actionParam.paused = true;
+			}
+			if (actionParam.onComplete != null) actionParam.onComplete();
+		}
+
+		actionParam.setFrameOffsetOnly(frameIndex);
+		actionParam.speed = speed;
+		actionParam.setTimeOffset(time);
+	}
+
 	function updateAnimSampled(anim: TAnimation, m: Mat4) {
 		if (anim == null) return;
 		var track = anim.tracks[0];
@@ -179,10 +248,35 @@ class Animation {
 		m._32 = vp.z;
 	}
 
-	public function setFrame(frame: Int) {
-		time = 0;
-		frameIndex = frame;
-		update(frame * Scene.active.raw.frame_time);
+	function updateAnimSampledNew(anim: TAnimation, m: Mat4, actionParam: Animparams) {
+
+		var track = anim.tracks[0];
+		var sign = actionParam.speed > 0 ? 1 : -1;
+
+		var t = actionParam.time;
+		var ti = actionParam.offset;
+		var t1 = track.frames[ti] * frameTime;
+		var t2 = track.frames[ti + sign] * frameTime;
+		var s: FastFloat = (t - t1) / (t2 - t1); // Linear
+
+		m1.setF32(track.values, ti * 16); // Offset to 4x4 matrix array
+		m2.setF32(track.values, (ti + sign) * 16);
+
+		// Decompose
+		m1.decompose(vpos, q1, vscl);
+		m2.decompose(vpos2, q2, vscl2);
+
+		// Lerp
+		vp.lerp(vpos, vpos2, s);
+		vs.lerp(vscl, vscl2, s);
+		q3.lerp(q1, q2, s);
+
+		// Compose
+		m.fromQuat(q3);
+		m.scale(vs);
+		m._30 = vp.x;
+		m._31 = vp.y;
+		m._32 = vp.z;
 	}
 
 	public function notifyOnMarker(name: String, onMarker: Void->Void) {
@@ -221,4 +315,51 @@ class Animation {
 		animationTime = 0;
 	}
 	#end
+}
+
+class Animparams {
+
+	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, onComplete: Void -> Void = null) {
+
+		this.action = action;
+		this.speed = speed;
+		this.loop = loop;
+		this.onComplete = onComplete;
+	}
+
+	public var action(default, null): String;
+	public var time(default, null): FastFloat = 0.0;
+	public var offset(default, null): Int = 0; // Frames to offset
+	public var speed: FastFloat; // Speed of the animation
+	public var loop: Bool;
+	public var paused: Bool = false;
+	public var onComplete: Void -> Void;
+
+	public inline function setFrameOffset(frameOffset: Int){
+		this.offset = frameOffset;
+		this.time = Scene.active.raw.frame_time * offset;
+	}
+
+	public inline function setTimeOffset(timeOffset: FastFloat){
+		this.time = timeOffset;
+		this.offset = Std.int(time / Scene.active.raw.frame_time);
+	}
+
+	public inline function restartAction(speed: FastFloat = 1.0, loop: Bool = true) {
+
+		this.speed = speed;
+		this.loop = loop;
+		this.setFrameOffset(0);
+		paused = false;	
+	}
+
+	public inline function setTimeOnly(time: FastFloat) {
+
+		this.time = time;		
+	}
+
+	public inline function setFrameOffsetOnly(frame: Int) {
+
+		this.offset = frame;		
+	}
 }
