@@ -82,7 +82,7 @@ class BoneAnimation extends Animation {
 		this.data = mo != null ? mo.data : null;
 		this.isSkinned = data != null ? data.isSkinned : false;
 		if (this.isSkinned) {
-			var boneSize = 8; // Dual-quat skinning
+			var boneSize = 12; // Dual-quat skinning + scaling
 			this.skinBuffer = new Float32Array(skinMaxBones * boneSize);
 			for (i in 0...this.skinBuffer.length) this.skinBuffer[i] = 0;
 			// Rotation is already applied to skin at export
@@ -167,7 +167,7 @@ class BoneAnimation extends Animation {
 		if (isSkinned) {
 			skeletonBones = data.geom.actions.get(action);
 			skeletonMats = data.geom.mats.get(action);
-			setPoseMats();
+			if(skeletonMatsPose == null) setPoseMats();
 		}
 		else {
 			armature.initMats();
@@ -179,8 +179,13 @@ class BoneAnimation extends Animation {
 	}
 
 	function setPoseMats(){
-		if(skeletonMatsPose != null) return;
-		var poseParam = new Animparams("armorypose");
+		var poseParam: Animparams;
+		if(data.geom.actions.get("armorypose") != null){
+			poseParam = new Animparams("armorypose");
+		}
+		else{
+			poseParam = new Animparams(action);
+		}
 		skeletonMatsPose = initBoneMatsEmpty();
 		updateAction(poseParam, skeletonMatsPose);
 	}
@@ -471,74 +476,85 @@ class BoneAnimation extends Animation {
 
 	}
 
-	public function blendActionMats(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat){
+	public function blendActionMats(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = 0){
 
 		for(i in 0...actionMats1.length){
-			// Decompose
-			m.setFrom(actionMats1[i]);
-			m1.setFrom(actionMats2[i]);
-			m.decompose(vpos, q1, vscl);
-			m1.decompose(vpos2, q2, vscl2);
-			// Lerp
-			v1.lerp(vpos, vpos2, factor);
-			v2.lerp(vscl, vscl2, factor);
-			q3.lerp(q1, q2, factor);
-			// Compose
-			m2.fromQuat(q3);
-			m2.scale(v2);
-			m2._30 = v1.x;
-			m2._31 = v1.y;
-			m2._32 = v1.z;
-			// Return Result
-			resultMat[i].setFrom(m2);
+
+			if(skeletonBones[i].bone_layers[layerMask]) {
+				// Decompose
+				m.setFrom(actionMats1[i]);
+				m1.setFrom(actionMats2[i]);
+				m.decompose(vpos, q1, vscl);
+				m1.decompose(vpos2, q2, vscl2);
+				// Lerp
+				v1.lerp(vpos, vpos2, factor);
+				v2.lerp(vscl, vscl2, factor);
+				q3.lerp(q1, q2, factor);
+				// Compose
+				m2.fromQuat(q3);
+				m2.scale(v2);
+				m2._30 = v1.x;
+				m2._31 = v1.y;
+				m2._32 = v1.z;
+				// Return Result
+				resultMat[i].setFrom(m2);
+			}
+			else {
+				resultMat[i].setFrom(actionMats1[i]);
+			}
 		}
 	}
 
-	public function additiveBlendActionMats(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat){
+	public function additiveBlendActionMats(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Int = 0){
 
 		for(i in 0...baseActionMats.length){
-			// Decompose
-			m.setFrom(baseActionMats[i]);
-			m1.setFrom(addActionMats[i]);
-			bm.setFrom(skeletonMatsPose[i]);
 
-			m.decompose(vpos, q1, vscl);
-			m1.decompose(vpos2, q2, vscl2);
-			bm.decompose(vpos3, q3, vscl3);
+			if(skeletonBones[i].bone_layers[layerMask]) {
+				// Decompose
+				m.setFrom(baseActionMats[i]);
+				m1.setFrom(addActionMats[i]);
+				bm.setFrom(skeletonMatsPose[i]);
 
-			// Add Transforms
-			v1.setFrom(vpos);
-			v2.setFrom(vpos2);
-			v2.sub(vpos3);
-			v2.mult(factor);
-			v1.add(v2);
+				m.decompose(vpos, q1, vscl);
+				m1.decompose(vpos2, q2, vscl2);
+				bm.decompose(vpos3, q3, vscl3);
 
-			// Add Scales
-			vscl2.mult(factor);
-			v2.set(1-factor, 1-factor, 1-factor, 1);
-			v2.add(vscl2);
-			v2.x *= vscl.x;
-			v2.y *= vscl.y;
-			v2.z *= vscl.z;
-			v2.w = 1.0;
+				// Add Transforms
+				v1.setFrom(vpos);
+				v2.setFrom(vpos2);
+				v2.sub(vpos3);
+				v2.mult(factor);
+				v1.add(v2);
 
-			// Add rotations
-			q2.lerp(q3, q2, factor);
-			wm.fromQuat(q3);
-			wm.getInverse(wm);
-			q3.fromMat(wm).normalize();
-			q3.multquats(q3, q2);
-			q3.multquats(q1, q3);
-			
+				// Add Scales
+				vscl2.mult(factor);
+				v2.set(1-factor, 1-factor, 1-factor, 1);
+				v2.add(vscl2);
+				v2.x *= vscl.x;
+				v2.y *= vscl.y;
+				v2.z *= vscl.z;
+				v2.w = 1.0;
 
-			// Compose
-			m2.fromQuat(q3);
-			m2.scale(v2);
-			m2._30 = v1.x;
-			m2._31 = v1.y;
-			m2._32 = v1.z;
-			// Return Result
-			resultMat[i].setFrom(m2);
+				// Add rotations
+				q2.lerp(q3, q2, factor);
+				wm.fromQuat(q3);
+				wm.getInverse(wm);
+				q3.fromMat(wm).normalize();
+				q3.multquats(q3, q2);
+				q3.multquats(q1, q3);
+
+				// Compose
+				m2.fromQuat(q3);
+				m2.scale(v2);
+				m2._30 = v1.x;
+				m2._31 = v1.y;
+				m2._32 = v1.z;
+				// Return Result
+				resultMat[i].setFrom(m2);
+			}
+			else{
+				resultMat[i].setFrom(baseActionMats[i]);
+			}
 		}
 	}
 
@@ -585,14 +601,19 @@ class BoneAnimation extends Animation {
 		q1.normalize();
 		q2.set(vpos.x, vpos.y, vpos.z, 0.0);
 		q2.multquats(q2, q1);
-		skinBuffer[i * 8] = q1.x; // Real
-		skinBuffer[i * 8 + 1] = q1.y;
-		skinBuffer[i * 8 + 2] = q1.z;
-		skinBuffer[i * 8 + 3] = q1.w;
-		skinBuffer[i * 8 + 4] = q2.x * 0.5; // Dual
-		skinBuffer[i * 8 + 5] = q2.y * 0.5;
-		skinBuffer[i * 8 + 6] = q2.z * 0.5;
-		skinBuffer[i * 8 + 7] = q2.w * 0.5;
+		skinBuffer[i * 12] = q1.x; // Real
+		skinBuffer[i * 12 + 1] = q1.y;
+		skinBuffer[i * 12 + 2] = q1.z;
+		skinBuffer[i * 12 + 3] = q1.w;
+		skinBuffer[i * 12 + 4] = q2.x * 0.5; // Dual
+		skinBuffer[i * 12 + 5] = q2.y * 0.5;
+		skinBuffer[i * 12 + 6] = q2.z * 0.5;
+		skinBuffer[i * 12 + 7] = q2.w * 0.5;
+		skinBuffer[i * 12 + 8] = vscl.x;
+		skinBuffer[i * 12 + 9] = vscl.y;
+		skinBuffer[i * 12 + 10] = vscl.z;
+		skinBuffer[i * 12 + 11] = 1.0;
+
 	}
 
 	public override function totalFrames(): Int {
