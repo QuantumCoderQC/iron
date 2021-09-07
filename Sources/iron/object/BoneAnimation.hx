@@ -26,7 +26,6 @@ class BoneAnimation extends Animation {
 	var skeletonBones: Array<TObj> = null;
 	var skeletonMats: Array<Mat4> = null;
 	//var skeletonBonesBlend: Array<TObj> = null;
-	var skeletonMatsPose: Array<Mat4> = null;
 	var absMats: Array<Mat4> = null;
 	var applyParent: Array<Bool> = null;
 	var matsFast: Array<Mat4> = [];
@@ -167,7 +166,6 @@ class BoneAnimation extends Animation {
 		if (isSkinned) {
 			skeletonBones = data.geom.actions.get(action);
 			skeletonMats = data.geom.mats.get(action);
-			if(skeletonMatsPose == null) setPoseMats();
 		}
 		else {
 			armature.initMats();
@@ -178,17 +176,6 @@ class BoneAnimation extends Animation {
 		setMats();
 	}
 
-	function setPoseMats(){
-		var poseParam: Animparams;
-		if(data.geom.actions.get("armorypose") != null){
-			poseParam = new Animparams("armorypose");
-		}
-		else{
-			poseParam = new Animparams(action);
-		}
-		skeletonMatsPose = initBoneMatsEmpty();
-		updateAction(poseParam, skeletonMatsPose);
-	}
 
 	/* function setActionBlend(action: String) {
 		if (isSkinned) {
@@ -211,8 +198,9 @@ class BoneAnimation extends Animation {
 		if (action != "") {
 			setAction(action);
 			var tempAnimParam = new Animparams(action);
+			registerAction("tempAction", tempAnimParam);
 			updateAnimation = function(mats){
-				updateAction(tempAnimParam, mats);
+				sampleAction(tempAnimParam, mats);
 			}
 		}
 	}
@@ -301,7 +289,7 @@ class BoneAnimation extends Animation {
 		#end
 	} */
 
-	public function initBoneMatsEmpty(): Array<Mat4> {
+	public override function initMatsEmpty(): Array<Mat4> {
 
 		var mats = [];
 		for(i in 0...skeletonMats.length) mats.push(Mat4.identity());
@@ -318,6 +306,7 @@ class BoneAnimation extends Animation {
 		Animation.beginProfile();
 		#end
 
+		super.updateNew(delta);
 		if(updateAnimation != null) {
 			
 			updateAnimation(skeletonMats);
@@ -455,12 +444,8 @@ class BoneAnimation extends Animation {
 		updateAnimation = f;
 	}
 
-	public function updateAction(actionParam: Animparams, anctionMats: Array<Mat4>) {
-
-
-		super.updateNew(delta, actionParam);
+	override public function updateActionTrack(actionParam: Animparams) {
 		if(actionParam.paused) return;
-		
 		var bones = data.geom.actions.get(actionParam.action);
 		for(b in bones){
 			if (b.anim != null) {
@@ -468,7 +453,10 @@ class BoneAnimation extends Animation {
 				break;
 			}
 		}
+	}
 
+	override public function sampleAction(actionParam: Animparams, anctionMats: Array<Mat4>){
+		var bones = data.geom.actions.get(actionParam.action);
 		for (i in 0...bones.length) {
 			
 			updateAnimSampledNew(bones[i].anim, anctionMats[i], actionParam);
@@ -476,7 +464,7 @@ class BoneAnimation extends Animation {
 
 	}
 
-	public function blendActionMats(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = 0){
+	override public function blendActionMats(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = 0){
 
 		for(i in 0...actionMats1.length){
 
@@ -505,7 +493,7 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	public function additiveBlendActionMats(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Int = 0){
+	public function additiveBlendActionMats(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Int = 0){
 
 		for(i in 0...baseActionMats.length){
 
@@ -513,7 +501,7 @@ class BoneAnimation extends Animation {
 				// Decompose
 				m.setFrom(baseActionMats[i]);
 				m1.setFrom(addActionMats[i]);
-				bm.setFrom(skeletonMatsPose[i]);
+				bm.setFrom(restPoseMats[i]);
 
 				m.decompose(vpos, q1, vscl);
 				m1.decompose(vpos2, q2, vscl2);
@@ -703,27 +691,37 @@ class BoneAnimation extends Animation {
 		// Store all bones and lengths in array
 		var tip = effector;
 		bones.push(tip);
-		lengths.push(getBoneAbsLen(tip));
+		//lengths.push(getBoneAbsLen(tip));
 		var root = tip;
 
 		while (root.parent != null) {
 			if (bones.length > chainLenght - 1) break;
 			bones.push(root.parent);
-			lengths.push(getBoneAbsLen(root.parent));
+			//lengths.push(getBoneAbsLen(root.parent));
 			root = root.parent;
+		}
+
+		// Get all bone mats in world space
+		boneWorldMats = getWorldMatsFast(effector, bones.length);
+
+		var tempIndex = 0;
+		for(b in bones){
+			lengths.push(getBoneLen(b) * boneWorldMats[boneWorldMats.length - 1 - tempIndex].getScale().x);
+			tempIndex++;
 		}
 
 		// Root bone
 		root = bones[bones.length - 1];
 
 		// World matrix of root bone
-		var rootWorldMat = getWorldMat(root).clone();
+		var rootWorldMat = getAbsWorldMat(root).clone();
 		// World matrix of armature
-		var armatureMat = object.parent.transform.world.clone();
+		//var armatureMat = object.parent.transform.world.clone();
 		// Apply armature transform to world matrix
-		rootWorldMat.multmat(armatureMat);
+		//rootWorldMat.multmat(armatureMat);
 		// Distance from root to goal
 		var dist = Vec4.distance(goal, rootWorldMat.getLoc());
+
 
 		// Total bones length
 		var totalLength: FastFloat = 0.0;
@@ -753,9 +751,6 @@ class BoneAnimation extends Animation {
 			}
 			return;
 		}
-
-		// Get all bone mats in world space
-		boneWorldMats = getWorldMatsFast(effector, bones.length);
 
 		// Array of bone locations in world space, root location at [0]
 		var boneWorldLocs: Array<Vec4> = [];
