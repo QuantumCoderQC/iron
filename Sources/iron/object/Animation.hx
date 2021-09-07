@@ -43,7 +43,9 @@ class Animation {
 	var blendFactor: FastFloat = 0.0;
 
 	var lastFrameIndex = -1;
-	var markerEvents: Map<String, Array<Void->Void>> = null;
+	var markerEvents: Map<Animparams, Map<String, Array<Void->Void>>> = null;
+
+	public var activeActions: Map<String, Animparams> = null;
 
 	function new() {
 		Scene.active.animations.push(this);
@@ -96,11 +98,57 @@ class Animation {
 		}
 	}
 
-	public function updateNew(delta: FastFloat, actionParam: Animparams){
+	/* public function updateNew(delta: FastFloat, actionParam: Animparams){
 
 		if (actionParam.paused || actionParam.speed == 0.0) return;
 		
 		actionParam.setTimeOnly(actionParam.time + delta * actionParam.speed);
+
+		updateTrackNew()
+	} */
+
+	public function updateActionTrack(actionParam: Animparams){
+		
+		return;
+
+	}
+
+	public function initMatsEmpty(): Array<Mat4> {
+		return null;
+	}
+
+	public function blendActionMats(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = 0){
+		return;
+	}
+
+	public function updateNew(delta: FastFloat) {
+		if(activeActions == null) return;
+
+		for(actionParam in activeActions){
+			if (actionParam.paused || actionParam.speed == 0.0) {
+				continue;
+			}
+			else {
+				actionParam.setTimeOnly(actionParam.time + delta * actionParam.speed);
+				updateActionTrack(actionParam);
+			}
+		}
+		
+	}
+
+	public function registerAction(actionID: String, actionParam: Animparams){
+		if (activeActions == null) activeActions = new Map();
+		activeActions.set(actionID, actionParam);
+	}
+
+	public function deRegisterAction(actionID: String) {
+		if (activeActions == null) return;
+		if(activeActions.exists(actionID)) activeActions.remove(actionID);
+		
+	}
+
+	public function sampleAction(actionParam: Animparams, anctionMats: Array<Mat4>){
+		return;
 	}
 
 	function isTrackEnd(track: TTrack): Bool {
@@ -132,7 +180,7 @@ class Animation {
 		time = track.frames[frameIndex] * frameTime;
 	}
 
-	function updateTrack(anim: TAnimation) {
+	/* function updateTrack(anim: TAnimation) {
 		if (anim == null) return;
 
 		var track = anim.tracks[0];
@@ -165,9 +213,9 @@ class Animation {
 			}
 			if (onComplete != null && blendTime == 0) onComplete();
 		}
-	}
+	} */
 
-	function updateTrackNew(anim: TAnimation, actionParam: Animparams) {		
+	function updateTrackNew(anim: TAnimation, actionParam: Animparams) {
 
 		var time = actionParam.time;
 		var frameIndex = actionParam.offset;
@@ -175,7 +223,6 @@ class Animation {
 
 		var track = anim.tracks[0];
 
-		//trace(frameIndex);
 		if (frameIndex == -1) {
 			frameIndex = speed > 0 ? 0 : track.frames.length - 1;
 			time = track.frames[frameIndex] * frameTime;
@@ -185,18 +232,18 @@ class Animation {
 		var sign = speed > 0 ? 1 : -1;
 		while (checkFrameIndexNew(track.frames, time, frameIndex, speed)) frameIndex += sign;
 
-/* 		trace(sign);
-		trace(frameIndex); */
-
 		// Marker events
 		if (markerEvents != null && anim.marker_names != null && frameIndex != lastFrameIndex) {
-			for (i in 0...anim.marker_frames.length) {
-				if (frameIndex == anim.marker_frames[i]) {
-					var ar = markerEvents.get(anim.marker_names[i]);
-					for (f in ar) f();
+			if(markerEvents.get(actionParam) != null){
+				for (i in 0...anim.marker_frames.length) {
+					if (frameIndex == anim.marker_frames[i]) {
+						var marketAct = markerEvents.get(actionParam);
+						var ar = marketAct.get(anim.marker_names[i]);
+						for (f in ar) f();
+					}
 				}
+				lastFrameIndex = frameIndex;
 			}
-			lastFrameIndex = frameIndex;
 		}
 
 		// End of track
@@ -214,7 +261,8 @@ class Animation {
 
 		actionParam.setFrameOffsetOnly(frameIndex);
 		actionParam.speed = speed;
-		actionParam.setTimeOffset(time);
+		actionParam.setTimeOnly(time);
+
 	}
 
 	function updateAnimSampled(anim: TAnimation, m: Mat4) {
@@ -254,7 +302,11 @@ class Animation {
 		var sign = actionParam.speed > 0 ? 1 : -1;
 
 		var t = actionParam.time;
+		//t = t < 0 ? 0.1 : t;
+
 		var ti = actionParam.offset;
+		//ti = ti < 0 ? 1 : ti;
+
 		var t1 = track.frames[ti] * frameTime;
 		var t2 = track.frames[ti + sign] * frameTime;
 		var s: FastFloat = (t - t1) / (t2 - t1); // Linear
@@ -279,18 +331,28 @@ class Animation {
 		m._32 = vp.z;
 	}
 
-	public function notifyOnMarker(name: String, onMarker: Void->Void) {
+	public function notifyOnMarker(actionParam: Animparams, name: String, onMarker: Void->Void) {
 		if (markerEvents == null) markerEvents = new Map();
-		var ar = markerEvents.get(name);
+
+		var markerAct = markerEvents.get(actionParam);
+		if(markerAct == null){
+			markerAct = new Map();
+			markerEvents.set(actionParam, markerAct);
+		}
+
+		var ar = markerAct.get(name);
 		if (ar == null) {
 			ar = [];
-			markerEvents.set(name, ar);
+			markerAct.set(name, ar);
 		}
 		ar.push(onMarker);
 	}
 
-	public function removeMarker(name: String, onMarker: Void->Void) {
-		markerEvents.get(name).remove(onMarker);
+	public function removeMarker(actionParam: Animparams, name: String, onMarker: Void->Void) {
+		var markerAct = markerEvents.get(actionParam);
+		if(markerAct == null) return;
+
+		markerAct.get(name).remove(onMarker);
 	}
 
 	public function currentFrame(): Int {
@@ -345,12 +407,15 @@ class Animparams {
 		this.offset = Std.int(time / Scene.active.raw.frame_time);
 	}
 
-	public inline function restartAction(speed: FastFloat = 1.0, loop: Bool = true) {
+	public inline function restartAction() {
 
-		this.speed = speed;
-		this.loop = loop;
 		this.setFrameOffset(0);
 		paused = false;	
+	}
+
+	public function notifyOnComplete(onComplete: Void -> Void) {
+		this.onComplete = onComplete;
+		
 	}
 
 	public inline function setTimeOnly(time: FastFloat) {
