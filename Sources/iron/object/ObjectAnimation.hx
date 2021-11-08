@@ -1,5 +1,6 @@
 package iron.object;
 
+import kha.arrays.Float32Array;
 import kha.FastFloat;
 import kha.arrays.Uint32Array;
 import iron.math.Vec4;
@@ -43,7 +44,8 @@ class ObjectAnimation extends Animation {
 		Animation.beginProfile();
 		#end
 
-		super.update(delta);
+		//super.update(delta);
+		super.updateNew(delta);
 		if (paused) return;
 		if (!isSkinned) updateObjectAnim();
 
@@ -55,6 +57,19 @@ class ObjectAnimation extends Animation {
 	function updateObjectAnim() {
 		updateTransformAnim(oaction.anim, object.transform);
 		object.transform.buildMatrix();
+	}
+
+	override public function updateActionTrack(actionParam: Animparams) {
+		if(actionParam.paused) return;
+		updateTrackNew(oaction.anim, actionParam)
+
+	}
+
+	public function sampleAction(actionParam: Animparams, transform: Transform){
+		var objanim = getAction(actionParam.action);
+			
+		updateTransformAnim(objanim.anim, transform);
+
 	}
 
 	inline function interpolateLinear(t: FastFloat, t1: FastFloat, t2: FastFloat, v1: FastFloat, v2: FastFloat): FastFloat {
@@ -93,7 +108,8 @@ class ObjectAnimation extends Animation {
 			t.dscale.set(0, 0, 0);
 			t._deulerX = t._deulerY = t._deulerZ = 0.0;
 		}
-
+		trace("num tracks =");
+		trace(anim.tracks.length);
 		for (track in anim.tracks) {
 
 			if (frameIndex == -1) rewind(track);
@@ -124,6 +140,8 @@ class ObjectAnimation extends Animation {
 			var v2 = track.values[ti + sign];
 
 			var value = interpolateLinear(t, t1, t2, v1, v2);
+
+			var farray = new Float32Array(26);
 
 			switch (track.target) {
 				case "xloc": transform.loc.x = value;
@@ -157,8 +175,49 @@ class ObjectAnimation extends Animation {
 		}
 	}
 
+	function updateTransformAnimNew(anim: TAnimation, transform: Float32Array) {
+		for (track in anim.tracks) {
+
+			switch (track.target) {
+
+				case "xloc": transform.set(0, value);
+				case "yloc": transform.set(1, value);
+				case "zloc": transform.set(2, value);
+				case "xrot": transform.set(3, value);
+				case "yrot": transform.set(4, value);
+				case "zrot": transform.set(5, value);
+				case "qwrot": transform.set(6, value); 
+				case "qxrot": transform.set(7, value);
+				case "qyrot": transform.set(8, value);
+				case "qzrot": transform.set(9, value);
+				case "xscl": transform.set(10, value);
+				case "yscl": transform.set(11, value);
+				case "zscl": transform.set(12, value);
+				// Delta
+				case "dxloc": transform.set(13, value);
+				case "dyloc": transform.set(14, value);
+				case "dzloc": transform.set(15, value);
+				case "dxrot": transform.set(16, value);
+				case "dyrot": transform.set(17, value);
+				case "dzrot": transform.set(18, value);
+				case "dqwrot": transform.set(19, value);
+				case "dqxrot": transform.set(20, value);
+				case "dqyrot": transform.set(21, value);
+				case "dqzrot": transform.set(22, value);
+				case "dxscl": transform.set(23, value); 
+				case "dyscl": transform.set(24, value);
+				case "dzscl": transform.set(25, value);
+			}
+		}
+	}
+
 	override public function totalFrames(): Int {
 		if (oaction == null || oaction.anim == null) return 0;
 		return oaction.anim.end - oaction.anim.begin;
+	}
+
+	public enum TargetType {
+		xloc;
+		
 	}
 }
