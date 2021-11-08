@@ -147,9 +147,9 @@ class Animation {
 		
 	}
 
-	public function sampleAction(actionParam: Animparams, anctionMats: Array<Mat4>){
+	/* public function sampleAction(actionParam: Animparams, anctionMats: Array<Mat4>){
 		return;
-	}
+	} */
 
 	function isTrackEnd(track: TTrack): Bool {
 		return speed > 0 ?

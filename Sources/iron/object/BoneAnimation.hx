@@ -455,7 +455,7 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	override public function sampleAction(actionParam: Animparams, anctionMats: Array<Mat4>){
+	public function sampleAction(actionParam: Animparams, anctionMats: Array<Mat4>){
 		var bones = data.geom.actions.get(actionParam.action);
 		for (i in 0...bones.length) {
 			
