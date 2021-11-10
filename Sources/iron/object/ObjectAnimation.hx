@@ -1,5 +1,7 @@
 package iron.object;
 
+import iron.object.Animation.Animparams;
+
 import kha.arrays.Float32Array;
 import kha.FastFloat;
 import kha.arrays.Uint32Array;
@@ -15,6 +17,10 @@ class ObjectAnimation extends Animation {
 	var oaction: TObj;
 	var s0: FastFloat = 0.0;
 	var bezierFrameIndex = -1;
+
+	var updateAnimation: Float32Array->Void;
+
+	public var transformArr: Float32Array;
 
 	public function new(object: Object, oactions: Array<TSceneFormat>) {
 		this.object = object;
@@ -38,20 +44,34 @@ class ObjectAnimation extends Animation {
 	}
 
 	override public function update(delta: FastFloat) {
-		if (!object.visible || object.culled || oaction == null) return;
+		trace("objet animation update loop");
+		if (!object.visible || object.culled) return;
 
 		#if arm_debug
 		Animation.beginProfile();
 		#end
 
+		if(transformArr == null) transformArr = new Float32Array(26);
+
 		//super.update(delta);
 		super.updateNew(delta);
 		if (paused) return;
-		if (!isSkinned) updateObjectAnim();
+		trace(updateAnimation);
+		if(updateAnimation == null) return;
+		trace("update animation not null");
+		if (!isSkinned) updateObjectAnimNew();
 
 		#if arm_debug
 		Animation.endProfile();
 		#end
+	}
+
+	public function animationLoop(f: Float32Array->Void){
+		
+		trace("setting update loop");
+		trace(updateAnimation);
+		updateAnimation = f;
+		trace(updateAnimation);
 	}
 
 	function updateObjectAnim() {
@@ -59,17 +79,90 @@ class ObjectAnimation extends Animation {
 		object.transform.buildMatrix();
 	}
 
+	function updateObjectAnimNew() {
+		trace("update object anim new");
+		updateAnimation(transformArr);
+		updateTransformAnimNew(transformArr, object.transform);
+		object.transform.buildMatrix();
+	}
+
 	override public function updateActionTrack(actionParam: Animparams) {
 		if(actionParam.paused) return;
-		updateTrackNew(oaction.anim, actionParam)
+		oaction = getAction(actionParam.action);
+		updateTrackNew(oaction.anim, actionParam);
 
 	}
 
-	public function sampleAction(actionParam: Animparams, transform: Transform){
+	function updateAnimSampledObjNew(anim: TAnimation, transformArr: Float32Array, actionParam: Animparams) {
+
+		for (track in anim.tracks) {
+			trace("setting values");
+			trace(track.target);
+			trace(transformArr);
+			var sign = actionParam.speed > 0 ? 1 : -1;
+
+			var t = actionParam.time;
+			//t = t < 0 ? 0.1 : t;
+
+			var ti = actionParam.offset;
+			//ti = ti < 0 ? 1 : ti;
+
+			var t1 = track.frames[ti] * frameTime;
+			var t2 = track.frames[ti + sign] * frameTime;
+			var v1 = track.values[ti];
+			var v2 = track.values[ti + sign];
+
+			var value = interpolateLinear(t, t1, t2, v1, v2);
+
+			if(value == null) continue;
+			trace("setting values 2");
+			switch (track.target) {
+
+				case "xloc": transformArr.set(0, value);
+				case "yloc": transformArr.set(1, value);
+				case "zloc": transformArr.set(2, value);
+				case "xrot": transformArr.set(3, value);
+				case "yrot": transformArr.set(4, value);
+				case "zrot": transformArr.set(5, value);
+				case "qwrot": transformArr.set(6, value); 
+				case "qxrot": transformArr.set(7, value);
+				case "qyrot": transformArr.set(8, value);
+				case "qzrot": transformArr.set(9, value);
+				case "xscl": transformArr.set(10, value);
+				case "yscl": transformArr.set(11, value);
+				case "zscl": transformArr.set(12, value);
+				// Delta
+				case "dxloc": transformArr.set(13, value);
+				case "dyloc": transformArr.set(14, value);
+				case "dzloc": transformArr.set(15, value);
+				case "dxrot": transformArr.set(16, value);
+				case "dyrot": transformArr.set(17, value);
+				case "dzrot": transformArr.set(18, value);
+				case "dqwrot": transformArr.set(19, value);
+				case "dqxrot": transformArr.set(20, value);
+				case "dqyrot": transformArr.set(21, value);
+				case "dqzrot": transformArr.set(22, value);
+				case "dxscl": transformArr.set(23, value); 
+				case "dyscl": transformArr.set(24, value);
+				case "dzscl": transformArr.set(25, value);
+			}
+			trace("setting values 3");
+		}
+	}
+
+	public function sampleAction(actionParam: Animparams, transformArr: Float32Array){
+		trace("sampling action");
 		var objanim = getAction(actionParam.action);
 			
-		updateTransformAnim(objanim.anim, transform);
+		updateAnimSampledObjNew(objanim.anim, transformArr, actionParam);
+	}
 
+	public function blendActionObject(transformArr1: Float32Array, transformArr2: Float32Array, transformArrRes: Float32Array, factor: FastFloat ) {
+
+		for(i in 0...transformArrRes.length){
+			transformArrRes.set(i, (1.0 - factor) * transformArr1.get(i) + factor * transformArr2.get(i));
+		}
+		
 	}
 
 	inline function interpolateLinear(t: FastFloat, t1: FastFloat, t2: FastFloat, v1: FastFloat, v2: FastFloat): FastFloat {
@@ -141,8 +234,6 @@ class ObjectAnimation extends Animation {
 
 			var value = interpolateLinear(t, t1, t2, v1, v2);
 
-			var farray = new Float32Array(26);
-
 			switch (track.target) {
 				case "xloc": transform.loc.x = value;
 				case "yloc": transform.loc.y = value;
@@ -175,49 +266,55 @@ class ObjectAnimation extends Animation {
 		}
 	}
 
-	function updateTransformAnimNew(anim: TAnimation, transform: Float32Array) {
-		for (track in anim.tracks) {
+	@:access(iron.object.Transform)
+	function updateTransformAnimNew(transformArr: Float32Array, transform: Transform) {
 
-			switch (track.target) {
+		trace("setting object transform new");
 
-				case "xloc": transform.set(0, value);
-				case "yloc": transform.set(1, value);
-				case "zloc": transform.set(2, value);
-				case "xrot": transform.set(3, value);
-				case "yrot": transform.set(4, value);
-				case "zrot": transform.set(5, value);
-				case "qwrot": transform.set(6, value); 
-				case "qxrot": transform.set(7, value);
-				case "qyrot": transform.set(8, value);
-				case "qzrot": transform.set(9, value);
-				case "xscl": transform.set(10, value);
-				case "yscl": transform.set(11, value);
-				case "zscl": transform.set(12, value);
-				// Delta
-				case "dxloc": transform.set(13, value);
-				case "dyloc": transform.set(14, value);
-				case "dzloc": transform.set(15, value);
-				case "dxrot": transform.set(16, value);
-				case "dyrot": transform.set(17, value);
-				case "dzrot": transform.set(18, value);
-				case "dqwrot": transform.set(19, value);
-				case "dqxrot": transform.set(20, value);
-				case "dqyrot": transform.set(21, value);
-				case "dqzrot": transform.set(22, value);
-				case "dxscl": transform.set(23, value); 
-				case "dyscl": transform.set(24, value);
-				case "dzscl": transform.set(25, value);
-			}
+		var t = transform;
+		if (t.dloc == null) {
+			t.dloc = new Vec4();
+			t.drot = new Quat();
+			t.dscale = new Vec4();
 		}
+		t.dloc.set(0, 0, 0);
+		t.dscale.set(0, 0, 0);
+		t._deulerX = t._deulerY = t._deulerZ = 0.0;
+
+		transform.loc.x = transformArr.get(0);
+		transform.loc.y = transformArr.get(1);
+		transform.loc.z = transformArr.get(2);
+		transform.setRotation(transformArr.get(3), transform._eulerY, transform._eulerZ);
+		transform.setRotation(transform._eulerX, transformArr.get(4), transform._eulerZ);
+		transform.setRotation(transform._eulerX, transform._eulerY, transformArr.get(5));
+		transform.rot.w = transformArr.get(6);
+		transform.rot.x = transformArr.get(7);
+		transform.rot.y = transformArr.get(8);
+		transform.rot.z = transformArr.get(9);
+		transform.scale.x = transformArr.get(10);
+		transform.scale.y = transformArr.get(11);
+		transform.scale.z = transformArr.get(12);
+			// Delta
+		transform.dloc.x = transformArr.get(13);
+		transform.dloc.y = transformArr.get(14);
+		transform.dloc.z = transformArr.get(15);
+		transform._deulerX = transformArr.get(16);
+		transform._deulerY = transformArr.get(17);
+		transform._deulerZ = transformArr.get(18);
+		transform.drot.w = transformArr.get(19);
+		transform.drot.x = transformArr.get(20);
+		transform.drot.y = transformArr.get(21);
+		transform.drot.z = transformArr.get(22);
+		transform.dscale.x = transformArr.get(23);
+		transform.dscale.y = transformArr.get(24);
+		transform.dscale.z = transformArr.get(25);
+
+		trace("setting object transform new 2");
+		
 	}
 
 	override public function totalFrames(): Int {
 		if (oaction == null || oaction.anim == null) return 0;
 		return oaction.anim.end - oaction.anim.begin;
-	}
-
-	public enum TargetType {
-		xloc;
-		
 	}
 }
