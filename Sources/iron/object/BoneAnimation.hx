@@ -23,6 +23,8 @@ class BoneAnimation extends Animation {
 	public var data: MeshData;
 	public var skinBuffer: Float32Array;
 
+	var updateAnimation: Array<Mat4>->Void = null;
+
 	var skeletonBones: Array<TObj> = null;
 	var skeletonMats: Array<Mat4> = null;
 	//var skeletonBonesBlend: Array<TObj> = null;
@@ -439,7 +441,6 @@ class BoneAnimation extends Animation {
 	}
 
 	// Do animation here
-	var updateAnimation: Array<Mat4>->Void = null;
 	public function animationLoop(f: Array<Mat4>->Void){
 		updateAnimation = f;
 	}
