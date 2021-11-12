@@ -38,6 +38,8 @@ class BoneAnimation extends Animation {
 	var rootMotion: TObj = null;
 	var rootMotionVelocity: Vec4 = null;
 	var oldPos: Vec4 = null;
+	var oldPosWorld: Vec4 = null;
+	var oldTransform: Mat4 = null;
 
 	var delta: FastFloat = 0;
 
@@ -267,13 +269,20 @@ class BoneAnimation extends Animation {
 	function evaluateRootMotion(){
 		if(oldPos == null){
 			rootMotionVelocity = new Vec4();
-			oldPos = getAbsWorldMat(rootMotion).getLoc();
+			oldPosWorld = getAbsWorldMat(rootMotion).getLoc();
+			oldPos = getBoneMat(rootMotion).getLoc();
 			return;
 		}
 		var newPos = getAbsWorldMat(rootMotion).getLoc();
 		rootMotionVelocity = new Vec4().setFrom(newPos);
-		rootMotionVelocity.sub(oldPos);
-		oldPos.setFrom(newPos);
+		rootMotionVelocity.sub(oldPosWorld);
+		oldPosWorld.setFrom(newPos);
+		getBoneMat(rootMotion).setLoc(oldPos);
+		
+	}
+
+	public function getRootMotionBone(): TObj{
+		return rootMotion;
 	}
 
 	function multParents(m: Mat4, i: Int, bones: Array<TObj>, mats: Array<Mat4>) {
