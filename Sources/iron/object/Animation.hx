@@ -39,7 +39,6 @@ class Animation {
 
 	var blendTime: FastFloat = 0.0;
 	var blendCurrent: FastFloat = 0.0;
-	var blendAction = "";
 	var blendFactor: FastFloat = 0.0;
 
 	var lastFrameIndex = -1;
@@ -59,7 +58,6 @@ class Animation {
 		if (blendTime > 0) {
 			this.blendTime = blendTime;
 			this.blendCurrent = 0.0;
-			this.blendAction = this.action;
 			frameIndex = 0;
 			time = 0.0;
 		}
@@ -69,11 +67,6 @@ class Animation {
 		this.speed = speed;
 		this.loop = loop;
 		paused = false;
-	}
-
-	public function blend(action1: String, action2: String, factor: FastFloat) {
-		blendTime = 1.0; // Enable blending
-		blendFactor = factor;
 	}
 
 	public function pause() {
@@ -88,40 +81,11 @@ class Animation {
 		Scene.active.animations.remove(this);
 	}
 
-	public function update(delta: FastFloat) {
-		if (paused || speed == 0.0) return;
-		time += delta * speed;
-
-		if (blendTime > 0 && blendFactor == 0) {
-			blendCurrent += delta;
-			if (blendCurrent >= blendTime) blendTime = 0.0;
-		}
-	}
-
-	/* public function updateNew(delta: FastFloat, actionParam: Animparams){
-
-		if (actionParam.paused || actionParam.speed == 0.0) return;
-		
-		actionParam.setTimeOnly(actionParam.time + delta * actionParam.speed);
-
-		updateTrackNew()
-	} */
-
 	public function updateActionTrack(actionParam: Animparams){
-		
-		return;
-
-	}
-
-	public function initMatsEmpty(): Array<Mat4> {
-		return null;
-	}
-
-	public function blendActionMats(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = 0){
 		return;
 	}
 
-	public function updateNew(delta: FastFloat) {
+	public function update(delta: FastFloat) {
 		if(activeActions == null) return;
 
 		for(actionParam in activeActions){
@@ -147,29 +111,13 @@ class Animation {
 		
 	}
 
-	/* public function sampleAction(actionParam: Animparams, anctionMats: Array<Mat4>){
-		return;
-	} */
-
-	function isTrackEnd(track: TTrack): Bool {
+	function isTrackEnd(track: TTrack, frameIndex: Int, speed: FastFloat): Bool {
 		return speed > 0 ?
 			frameIndex >= track.frames.length - 1 :
 			frameIndex <= 0;
 	}
 
-	function isTrackEndNew(track: TTrack, frameIndex: Int, speed: FastFloat): Bool {
-		return speed > 0 ?
-			frameIndex >= track.frames.length - 1 :
-			frameIndex <= 0;
-	}
-
-	inline function checkFrameIndex(frameValues: Uint32Array): Bool {
-		return speed > 0 ?
-			((frameIndex + 1) < frameValues.length && time > frameValues[frameIndex + 1] * frameTime) :
-			((frameIndex - 1) > -1 && time < frameValues[frameIndex - 1] * frameTime);
-	}
-
-	inline function checkFrameIndexNew(frameValues: Uint32Array, time: FastFloat, frameIndex: Int, speed: FastFloat): Bool {
+	inline function checkFrameIndex(frameValues: Uint32Array, time: FastFloat, frameIndex: Int, speed: FastFloat): Bool {
 		return speed > 0 ?
 			((frameIndex + 1) < frameValues.length && time > frameValues[frameIndex + 1] * frameTime) :
 			((frameIndex - 1) > -1 && time < frameValues[frameIndex - 1] * frameTime);
@@ -180,42 +128,7 @@ class Animation {
 		time = track.frames[frameIndex] * frameTime;
 	}
 
-	/* function updateTrack(anim: TAnimation) {
-		if (anim == null) return;
-
-		var track = anim.tracks[0];
-
-		if (frameIndex == -1) rewind(track);
-
-		// Move keyframe
-		var sign = speed > 0 ? 1 : -1;
-		while (checkFrameIndex(track.frames)) frameIndex += sign;
-
-		// Marker events
-		if (markerEvents != null && anim.marker_names != null && frameIndex != lastFrameIndex) {
-			for (i in 0...anim.marker_frames.length) {
-				if (frameIndex == anim.marker_frames[i]) {
-					var ar = markerEvents.get(anim.marker_names[i]);
-					if (ar != null) for (f in ar) f();
-				}
-			}
-			lastFrameIndex = frameIndex;
-		}
-
-		// End of track
-		if (isTrackEnd(track)) {
-			if (loop || blendTime > 0) {
-				rewind(track);
-			}
-			else {
-				frameIndex -= sign;
-				paused = true;
-			}
-			if (onComplete != null && blendTime == 0) onComplete();
-		}
-	} */
-
-	function updateTrackNew(anim: TAnimation, actionParam: Animparams) {
+	function updateTrack(anim: TAnimation, actionParam: Animparams) {
 
 		var time = actionParam.time;
 		var frameIndex = actionParam.offset;
@@ -230,7 +143,7 @@ class Animation {
 
 		// Move keyframe
 		var sign = speed > 0 ? 1 : -1;
-		while (checkFrameIndexNew(track.frames, time, frameIndex, speed)) frameIndex += sign;
+		while (checkFrameIndex(track.frames, time, frameIndex, speed)) frameIndex += sign;
 
 		// Marker events
 		if (markerEvents != null && anim.marker_names != null && frameIndex != lastFrameIndex) {
@@ -247,7 +160,7 @@ class Animation {
 		}
 
 		// End of track
-		if (isTrackEndNew(track, frameIndex, speed)) {
+		if (isTrackEnd(track, frameIndex, speed)) {
 			if (actionParam.loop) {
 				frameIndex = speed > 0 ? 0 : track.frames.length - 1;
 				time = track.frames[frameIndex] * frameTime;
@@ -263,72 +176,6 @@ class Animation {
 		actionParam.speed = speed;
 		actionParam.setTimeOnly(time);
 
-	}
-
-	function updateAnimSampled(anim: TAnimation, m: Mat4) {
-		if (anim == null) return;
-		var track = anim.tracks[0];
-		var sign = speed > 0 ? 1 : -1;
-
-		var t = time;
-		var ti = frameIndex;
-		var t1 = track.frames[ti] * frameTime;
-		var t2 = track.frames[ti + sign] * frameTime;
-		var s: FastFloat = (t - t1) / (t2 - t1); // Linear
-
-		m1.setF32(track.values, ti * 16); // Offset to 4x4 matrix array
-		m2.setF32(track.values, (ti + sign) * 16);
-
-		// Decompose
-		m1.decompose(vpos, q1, vscl);
-		m2.decompose(vpos2, q2, vscl2);
-
-		// Lerp
-		vp.lerp(vpos, vpos2, s);
-		vs.lerp(vscl, vscl2, s);
-		q3.lerp(q1, q2, s);
-
-		// Compose
-		m.fromQuat(q3);
-		m.scale(vs);
-		m._30 = vp.x;
-		m._31 = vp.y;
-		m._32 = vp.z;
-	}
-
-	function updateAnimSampledNew(anim: TAnimation, m: Mat4, actionParam: Animparams) {
-
-		var track = anim.tracks[0];
-		var sign = actionParam.speed > 0 ? 1 : -1;
-
-		var t = actionParam.time;
-		//t = t < 0 ? 0.1 : t;
-
-		var ti = actionParam.offset;
-		//ti = ti < 0 ? 1 : ti;
-
-		var t1 = track.frames[ti] * frameTime;
-		var t2 = track.frames[ti + sign] * frameTime;
-		var s: FastFloat = (t - t1) / (t2 - t1); // Linear
-
-		m1.setF32(track.values, ti * 16); // Offset to 4x4 matrix array
-		m2.setF32(track.values, (ti + sign) * 16);
-
-		// Decompose
-		m1.decompose(vpos, q1, vscl);
-		m2.decompose(vpos2, q2, vscl2);
-
-		// Lerp
-		vp.lerp(vpos, vpos2, s);
-		vs.lerp(vscl, vscl2, s);
-		q3.lerp(q1, q2, s);
-
-		// Compose
-		m.fromQuat(q3);
-		m.scale(vs);
-		m._30 = vp.x;
-		m._31 = vp.y;
-		m._32 = vp.z;
 	}
 
 	public function notifyOnMarker(actionParam: Animparams, name: String, onMarker: Void->Void) {
