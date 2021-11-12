@@ -178,23 +178,6 @@ class BoneAnimation extends Animation {
 		setMats();
 	}
 
-
-	/* function setActionBlend(action: String) {
-		if (isSkinned) {
-			skeletonBonesBlend = skeletonBones;
-			skeletonMatsBlend = skeletonMats;
-			skeletonBones = data.geom.actions.get(action);
-			skeletonMats = data.geom.mats.get(action);
-		}
-		else {
-			armature.initMats();
-			var a = armature.getAction(action);
-			skeletonBones = a.bones;
-			skeletonMats = a.mats;
-		}
-		setMats();
-	} */
-
 	override public function play(action = "", onComplete: Void->Void = null, blendTime = 0.2, speed = 1.0, loop = true) {
 		super.play(action, onComplete, blendTime, speed, loop);
 		if (action != "") {
@@ -207,91 +190,7 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	/* override public function blend(action1: String, action2: String, factor: FastFloat) {
-		if (factor == 0.0) {
-			setAction(action1);
-			return;
-		}
-		setAction(action2);
-		setActionBlend(action1);
-		super.blend(action1, action2, factor);
-	} */
-
-	/* override public function update(delta: FastFloat) {
-		if (!isSkinned && skeletonBones == null) setAction(armature.actions[0].name);
-		if (object != null && (!object.visible || object.culled)) return;
-		if (skeletonBones == null || skeletonBones.length == 0) return;
-
-		#if arm_debug
-		Animation.beginProfile();
-		#end
-
-		super.update(delta);
-		if (paused || speed == 0.0) return;
-
-		var lastBones = skeletonBones;
-		for (b in skeletonBones) {
-			if (b.anim != null) {
-				updateTrack(b.anim);
-				break;
-			}
-		}
-		// Action has been changed by onComplete
-		if (lastBones != skeletonBones) return;
-
-		for (i in 0...skeletonBones.length) {
-			if (!skeletonBones[i].is_ik_fk_only) updateAnimSampled(skeletonBones[i].anim, skeletonMats[i]);
-		}
-		if (blendTime > 0 && skeletonBonesBlend != null) {
-			for (b in skeletonBonesBlend) {
-				if (b.anim != null) {
-					updateTrack(b.anim);
-					break;
-				}
-			}
-			for (i in 0...skeletonBonesBlend.length) {
-				updateAnimSampled(skeletonBonesBlend[i].anim, skeletonMatsBlend[i]);
-			}
-		}
-
-		if(updateAnimation != null) {
-			
-			if(animState == null) animState = new Map();
-			updateAnimation(skeletonMats)
-		};
-
-		updateConstraints();
-
-		// Do forward kinematics and inverse kinematics here
-		if (onUpdates != null) {
-			var i = 0;
-			var l = onUpdates.length;
-			while (i < l) {
-				onUpdates[i]();
-				l <= onUpdates.length ? i++ : l = onUpdates.length;
-			}
-		}
-
-		// Calc absolute bones
-		for (i in 0...skeletonBones.length) {
-			// Take bones with 0 parents first
-			multParent(matsFastSort[i], matsFast, skeletonBones, skeletonMats);
-		}
-		if (skeletonBonesBlend != null) {
-			for (i in 0...skeletonBonesBlend.length) {
-				multParent(matsFastBlendSort[i], matsFastBlend, skeletonBonesBlend, skeletonMatsBlend);
-			}
-		}
-
-		if (isSkinned) updateSkinGpu();
-		else updateBonesOnly();
-
-		#if arm_debug
-		Animation.endProfile();
-		#end
-	} */
-
-	public override function initMatsEmpty(): Array<Mat4> {
+	public function initMatsEmpty(): Array<Mat4> {
 
 		var mats = [];
 		for(i in 0...skeletonMats.length) mats.push(Mat4.identity());
@@ -308,7 +207,7 @@ class BoneAnimation extends Animation {
 		Animation.beginProfile();
 		#end
 
-		super.updateNew(delta);
+		super.update(delta);
 		if(updateAnimation != null) {
 			
 			updateAnimation(skeletonMats);
@@ -450,7 +349,7 @@ class BoneAnimation extends Animation {
 		var bones = data.geom.actions.get(actionParam.action);
 		for(b in bones){
 			if (b.anim != null) {
-				updateTrackNew(b.anim, actionParam);
+				updateTrack(b.anim, actionParam);
 				break;
 			}
 		}
@@ -460,12 +359,47 @@ class BoneAnimation extends Animation {
 		var bones = data.geom.actions.get(actionParam.action);
 		for (i in 0...bones.length) {
 			
-			updateAnimSampledNew(bones[i].anim, anctionMats[i], actionParam);
+			updateAnimSampled(bones[i].anim, anctionMats[i], actionParam);
 		}
 
 	}
 
-	override public function blendActionMats(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = 0){
+	function updateAnimSampled(anim: TAnimation, m: Mat4, actionParam: Animparams) {
+
+		var track = anim.tracks[0];
+		var sign = actionParam.speed > 0 ? 1 : -1;
+
+		var t = actionParam.time;
+		//t = t < 0 ? 0.1 : t;
+
+		var ti = actionParam.offset;
+		//ti = ti < 0 ? 1 : ti;
+
+		var t1 = track.frames[ti] * frameTime;
+		var t2 = track.frames[ti + sign] * frameTime;
+		var s: FastFloat = (t - t1) / (t2 - t1); // Linear
+
+		m1.setF32(track.values, ti * 16); // Offset to 4x4 matrix array
+		m2.setF32(track.values, (ti + sign) * 16);
+
+		// Decompose
+		m1.decompose(vpos, q1, vscl);
+		m2.decompose(vpos2, q2, vscl2);
+
+		// Lerp
+		v1.lerp(vpos, vpos2, s);
+		v2.lerp(vscl, vscl2, s);
+		q3.lerp(q1, q2, s);
+
+		// Compose
+		m.fromQuat(q3);
+		m.scale(v2);
+		m._30 = v1.x;
+		m._31 = v1.y;
+		m._32 = v1.z;
+	}
+
+	public function blendAction(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = 0){
 
 		for(i in 0...actionMats1.length){
 
@@ -494,7 +428,7 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	public function additiveBlendActionMats(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Int = 0){
+	public function additiveBlendAction(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Int = 0){
 
 		for(i in 0...baseActionMats.length){
 
