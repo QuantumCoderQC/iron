@@ -35,6 +35,10 @@ class BoneAnimation extends Animation {
 	var matsFastBlend: Array<Mat4> = [];
 	var matsFastBlendSort: Array<Int> = [];
 
+	var rootMotion: TObj = null;
+	var rootMotionVelocity: Vec4 = null;
+	var oldPos: Vec4 = null;
+
 	var delta: FastFloat = 0;
 
 	var boneChildren: Map<String, Array<Object>> = null; // Parented to bone
@@ -140,6 +144,16 @@ class BoneAnimation extends Animation {
 		}
 	}
 
+	public function setRootMotion(bone: TObj){
+		rootMotion = bone;
+		oldPos = null;
+		rootMotionVelocity = null;
+	}
+
+	public function getRootMoptionVelocity(): Vec4 {
+		return rootMotionVelocity;
+	}
+
 	function numParents(b: TObj): Int {
 		var i = 0;
 		var p = b.parent;
@@ -213,6 +227,8 @@ class BoneAnimation extends Animation {
 			updateAnimation(skeletonMats);
 		}
 
+		if(rootMotion != null ) evaluateRootMotion();
+
 		updateConstraints();
 		// Do forward kinematics and inverse kinematics here
 		if (onUpdates != null) {
@@ -246,6 +262,18 @@ class BoneAnimation extends Animation {
 		var p = bones[i].parent;
 		var bi = getBoneIndex(p, bones);
 		(p == null || bi == -1) ? f.setFrom(mats[i]) : f.multmats(fasts[bi], mats[i]);
+	}
+
+	function evaluateRootMotion(){
+		if(oldPos == null){
+			rootMotionVelocity = new Vec4();
+			oldPos = getAbsWorldMat(rootMotion).getLoc();
+			return;
+		}
+		var newPos = getAbsWorldMat(rootMotion).getLoc();
+		rootMotionVelocity = new Vec4().setFrom(newPos);
+		rootMotionVelocity.sub(oldPos);
+		oldPos.setFrom(newPos);
 	}
 
 	function multParents(m: Mat4, i: Int, bones: Array<TObj>, mats: Array<Mat4>) {
