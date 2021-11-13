@@ -267,18 +267,33 @@ class BoneAnimation extends Animation {
 	}
 
 	function evaluateRootMotion(){
+		var scl = object.parent.transform.scale;
 		if(oldPos == null){
 			rootMotionVelocity = new Vec4();
-			oldPosWorld = getAbsWorldMat(rootMotion).getLoc();
+			oldPosWorld = getWorldMat(rootMotion).getLoc();
+			oldPosWorld = multVecs(oldPosWorld, scl);
 			oldPos = getBoneMat(rootMotion).getLoc();
 			return;
 		}
-		var newPos = getAbsWorldMat(rootMotion).getLoc();
+		var newPos = getWorldMat(rootMotion).getLoc();
+		newPos = multVecs(newPos, scl);
 		rootMotionVelocity = new Vec4().setFrom(newPos);
 		rootMotionVelocity.sub(oldPosWorld);
 		oldPosWorld.setFrom(newPos);
 		getBoneMat(rootMotion).setLoc(oldPos);
 		
+	}
+
+
+	inline function multVecs(vec1: Vec4, vec2: Vec4): Vec4 {
+		var res = new Vec4().setFrom(vec1);
+		res.x *= vec2.x;
+		res.y *= vec2.y;
+		res.z *= vec2.z;
+		res.w *= vec2.w;
+
+		return res;
+
 	}
 
 	public function getRootMotionBone(): TObj{
