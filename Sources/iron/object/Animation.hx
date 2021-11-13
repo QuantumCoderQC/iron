@@ -169,7 +169,7 @@ class Animation {
 				frameIndex -= sign;
 				actionParam.paused = true;
 			}
-			if (actionParam.onComplete != null) actionParam.onComplete();
+			if (actionParam.onComplete != null) for(func in actionParam.onComplete){ func();};
 		}
 
 		actionParam.setFrameOffsetOnly(frameIndex);
@@ -228,7 +228,7 @@ class Animation {
 
 class Animparams {
 
-	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, onComplete: Void -> Void = null) {
+	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, onComplete: Array<Void -> Void> = null) {
 
 		this.action = action;
 		this.speed = speed;
@@ -242,7 +242,7 @@ class Animparams {
 	public var speed: FastFloat; // Speed of the animation
 	public var loop: Bool;
 	public var paused: Bool = false;
-	public var onComplete: Void -> Void;
+	public var onComplete: Array<Void -> Void>;
 
 	public inline function setFrameOffset(frameOffset: Int){
 		this.offset = frameOffset;
@@ -261,8 +261,13 @@ class Animparams {
 	}
 
 	public function notifyOnComplete(onComplete: Void -> Void) {
-		this.onComplete = onComplete;
+		if(this.onComplete == null) this.onComplete = [];
+		this.onComplete.push(onComplete);
 		
+	}
+
+	public function removeOnComplete(onComplete: Void -> Void) {
+		this.onComplete.remove(onComplete);
 	}
 
 	public inline function setTimeOnly(time: FastFloat) {
