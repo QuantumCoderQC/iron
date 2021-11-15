@@ -693,13 +693,11 @@ class BoneAnimation extends Animation {
 		// Store all bones and lengths in array
 		var tip = effector;
 		bones.push(tip);
-		//lengths.push(getBoneAbsLen(tip));
 		var root = tip;
 
 		while (root.parent != null) {
 			if (bones.length > chainLenght - 1) break;
 			bones.push(root.parent);
-			//lengths.push(getBoneAbsLen(root.parent));
 			root = root.parent;
 		}
 
@@ -717,10 +715,6 @@ class BoneAnimation extends Animation {
 
 		// World matrix of root bone
 		var rootWorldMat = getAbsWorldMat(root).clone();
-		// World matrix of armature
-		//var armatureMat = object.parent.transform.world.clone();
-		// Apply armature transform to world matrix
-		//rootWorldMat.multmat(armatureMat);
 		// Distance from root to goal
 		var dist = Vec4.distance(goal, rootWorldMat.getLoc());
 
