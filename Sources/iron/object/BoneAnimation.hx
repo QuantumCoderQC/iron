@@ -659,6 +659,21 @@ class BoneAnimation extends Animation {
 		return wm;
 	}
 
+	public function solveIKBlend(actionMats: Array<Mat4>, effector: TObj, goal: Vec4, precision = 0.01, maxIterations = 100, chainLenght = 100, pole: Vec4 = null, rollAngle = 0.0, influence = 0.0, layerMask: Null<Int> = null) {
+		
+		matsFastBlend = initMatsEmpty();
+
+		var i = 0;
+		for (mat in matsFastBlend){
+			mat.setFrom(actionMats[i]);
+			skeletonMats[i].setFrom(actionMats[i]);
+			i++;
+		}
+
+		solveIK(effector, goal, precision, maxIterations, chainLenght, pole, rollAngle);
+		blendAction(matsFastBlend, skeletonMats, actionMats, influence, layerMask);
+	}
+
 	public function solveIK(effector: TObj, goal: Vec4, precision = 0.01, maxIterations = 100, chainLenght = 100, pole: Vec4 = null, rollAngle = 0.0) {
 		// Array of bones to solve IK for, effector at 0
 		var bones: Array<TObj> = [];
@@ -896,6 +911,21 @@ class BoneAnimation extends Animation {
 
 		// Return new location of current bone
 		return bone1Res;
+	}
+
+	public function solveTwoBoneIKBlend(actionMats: Array<Mat4>, effector: TObj, goal: Vec4, pole: Vec4 = null, rollAngle = 0.0, influence = 0.0, layerMask: Null<Int> = null) {
+		
+		matsFastBlend = initMatsEmpty();
+
+		var i = 0;
+		for (mat in matsFastBlend){
+			mat.setFrom(actionMats[i]);
+			skeletonMats[i].setFrom(actionMats[i]);
+			i++;
+		}
+
+		solveTwoBoneIK(effector, goal, pole, rollAngle);
+		blendAction(matsFastBlend, skeletonMats, actionMats, influence, layerMask);
 	}
 
 	public function solveTwoBoneIK(effector: TObj, goal: Vec4, pole: Vec4 = null, rollAngle = 0.0) {
