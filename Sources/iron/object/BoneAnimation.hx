@@ -898,6 +898,135 @@ class BoneAnimation extends Animation {
 		return bone1Res;
 	}
 
+	public function solveTwoBoneIK(effector: TObj, goal: Vec4, pole: Vec4 = null, rollAngle = 0.0) {
+		var roll = new Quat().fromEuler(0, rollAngle, 0);
+		var root = effector.parent;
+
+		// Get bone transforms in world space
+		var effectorMat = getAbsWorldMat(effector).clone();
+		var rootMat = getAbsWorldMat(root).clone();
+
+		// Get bone lenghts
+		var effectorLen = getBoneLen(effector) * effectorMat.getScale().x;
+		var rootLen = getBoneLen(root) * rootMat.getScale().x;
+
+		// Get distance form root to goal
+		var goalLen = Math.abs(Vec4.distance(rootMat.getLoc(), goal));
+
+		var totalLength = effectorLen + rootLen;
+
+		// Get tip location of effector bone
+		var effectorTipPos = new Vec4().setFrom(effectorMat.look()).normalize();
+		effectorTipPos.mult(effectorLen);
+		effectorTipPos.add(effectorMat.getLoc());
+
+		// Get unit vector from root to effector tip
+		var vectorRootEffector = new Vec4().setFrom(effectorTipPos).sub(rootMat.getLoc());
+		vectorRootEffector.normalize();
+
+		// Get unit vector from root to goal
+		var vectorGoal = new Vec4().setFrom(goal).sub(rootMat.getLoc());
+		vectorGoal.normalize();
+
+		// Get unit vector of root bone
+		var vectorRoot = new Vec4().setFrom(rootMat.look()).normalize();
+
+		// Get unit vector of effector bone
+		var vectorEffector = new Vec4().setFrom(effectorMat.look()).normalize();		
+		
+		// Get dot product of vectors
+		var dot = new Vec4().setFrom(vectorRootEffector).dot(vectorRoot);
+		// Calmp between -1 and 1
+		dot = dot < -1.0 ? -1.0 : dot > 1.0 ? 1.0 : dot;
+		// Gat angle A1
+		var angleA1 = Math.acos(dot);
+
+		// Get angle A2
+		dot = new Vec4().setFrom(vectorRoot).mult(-1.0).dot(vectorEffector);
+		dot = dot < -1.0 ? -1.0 : dot > 1.0 ? 1.0 : dot;
+		var angleA2 = Math.acos(dot);
+
+		// Get angle A3
+		dot = new Vec4().setFrom(vectorRootEffector).dot(vectorGoal);
+		dot = dot < -1.0 ? -1.0 : dot > 1.0 ? 1.0 : dot;
+		var angleA3 = Math.acos(dot);
+
+		// Get angle B1
+		dot = (effectorLen * effectorLen - rootLen * rootLen - goalLen * goalLen) / (-2 * rootLen * goalLen);
+		dot = dot < -1.0 ? -1.0 : dot > 1.0 ? 1.0 : dot;
+		var angleB1 = Math.acos(dot);
+
+		// Get angle B2
+		dot = (goalLen * goalLen - rootLen * rootLen - effectorLen * effectorLen) / (-2 * rootLen * effectorLen);
+		dot = dot < -1.0 ? -1.0 : dot > 1.0 ? 1.0 : dot;
+		var angleB2 = Math.acos(dot);
+
+		// Calculate rotation axes
+		var axis0 = new Vec4().setFrom(vectorRootEffector).cross(vectorRoot).normalize();
+		var axis1 = new Vec4().setFrom(vectorRootEffector).cross(vectorGoal).normalize();
+
+		// Apply rotations to effector bone
+		vpos.setFrom(effectorMat.getLoc());
+		effectorMat.setLoc(new Vec4());
+		effectorMat.applyQuat(new Quat().fromAxisAngle(axis0, angleB2 - angleA2));
+		effectorMat.setLoc(vpos);
+		setBoneMatFromWorldMat(effectorMat, effector);
+
+		// Apply rotations to root bone
+		vpos.setFrom(rootMat.getLoc());
+		rootMat.setLoc(new Vec4());
+		rootMat.applyQuat(new Quat().fromAxisAngle(axis0, angleB1 - angleA1));
+		rootMat.applyQuat(new Quat().fromAxisAngle(axis1, angleA3));
+		rootMat.setLoc(vpos);
+		setBoneMatFromWorldMat(rootMat, root);
+
+		// Recalculate new effector matrix
+		effectorMat.setFrom(getAbsWorldMat(effector));
+
+		// Check if pole present
+		if((pole != null) && (goalLen < totalLength)) {
+		
+			// Calculate new effector tip position
+			vscl.setFrom(effectorMat.look()).normalize();
+			vscl.mult(effectorLen);
+			vscl.add(effectorMat.getLoc());
+
+			// Calculate new effector position from pole
+			vpos2 = moveTowardPole(rootMat.getLoc(), effectorMat.getLoc(), vscl, pole);
+
+			// Orient root bone to new effector position
+			vpos.setFrom(rootMat.getLoc());
+			rootMat.setLoc(new Vec4());
+			vpos3.setFrom(vpos2).sub(vpos).normalize();
+			rootMat.applyQuat(new Quat().fromTo(rootMat.look().normalize(), vpos3));
+			rootMat.setLoc(vpos);
+			
+			// Orient effector bone to new position
+			vpos.setFrom(effectorMat.getLoc());
+			effectorMat.setLoc(new Vec4());
+			vpos3.setFrom(vscl).sub(vpos2).normalize();
+			effectorMat.applyQuat(new Quat().fromTo(effectorMat.look().normalize(), vpos3));
+			effectorMat.setLoc(vpos2);
+		}
+
+		// Apply roll to root bone
+		vpos.setFrom(rootMat.getLoc());
+		rootMat.setLoc(new Vec4());
+		rootMat.applyQuat(new Quat().fromAxisAngle(rootMat.look().normalize(), rollAngle));
+		rootMat.setLoc(vpos);
+
+		// Apply roll to effector bone
+		vpos.setFrom(effectorMat.getLoc());
+		effectorMat.setLoc(new Vec4());
+		effectorMat.applyQuat(new Quat().fromAxisAngle(effectorMat.look().normalize(), rollAngle));
+		effectorMat.setLoc(vpos);
+
+		// Finally set root and effector matrices in local space
+		setBoneMatFromWorldMat(rootMat, root);
+		setBoneMatFromWorldMat(effectorMat, effector);
+
+	}
+
 	// Returns an array of bone matrices in world space
 	public function getWorldMatsFast(tip: TObj, chainLength: Int): Array<Mat4> {
 		var wmArray: Array<Mat4> = [];
