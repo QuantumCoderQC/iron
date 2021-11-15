@@ -451,11 +451,11 @@ class BoneAnimation extends Animation {
 		m._32 = v1.z;
 	}
 
-	public function blendAction(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = 0){
+	public function blendAction(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Null<Int> = null){
 
 		for(i in 0...actionMats1.length){
 
-			if(skeletonBones[i].bone_layers[layerMask]) {
+			if(skeletonBones[i].bone_layers[layerMask] || layerMask == null) {
 				// Decompose
 				m.setFrom(actionMats1[i]);
 				m1.setFrom(actionMats2[i]);
@@ -480,11 +480,11 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	public function additiveBlendAction(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Int = 0){
+	public function additiveBlendAction(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Null<Int> = null){
 
 		for(i in 0...baseActionMats.length){
 
-			if(skeletonBones[i].bone_layers[layerMask]) {
+			if(skeletonBones[i].bone_layers[layerMask] || layerMask == null) {
 				// Decompose
 				m.setFrom(baseActionMats[i]);
 				m1.setFrom(addActionMats[i]);
