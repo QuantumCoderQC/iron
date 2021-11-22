@@ -1,5 +1,6 @@
 package iron.object;
 
+import iron.math.Vec2;
 import kha.FastFloat;
 import kha.arrays.Uint32Array;
 import iron.math.Vec4;
@@ -208,6 +209,29 @@ class Animation {
 
 	public function totalFrames(): Int {
 		return 0;
+	}
+
+	public function getBlend2DWeights(actionCoords: Array<Vec2>, sampleCoords: Vec2): Array<FastFloat> {
+		var weights: Array<FastFloat> = [0.0, 0.0, 0.0];
+
+		// Gradient Band Interpolation
+		var i = 0;
+		for (weight in weights){
+
+			var v1 = new Vec2().setFrom(sampleCoords).sub(actionCoords[i]);
+			var tempWeights = [];
+			for (coord in actionCoords){
+				var v2 = new Vec2().setFrom(coord).sub(actionCoords[i]);
+				var len = v2.length();
+				var w = 1.0 - ((new Vec2().setFrom(v1).dot(v2)) / (len * len));
+
+				tempWeights.push(w);				
+			}
+
+			weights[i] = Math.min(Math.min(w[0], w[1]), w[2]);
+		}
+
+		return weights;
 	}
 
 	#if arm_debug
