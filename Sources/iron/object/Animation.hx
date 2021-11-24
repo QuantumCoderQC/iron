@@ -1,5 +1,7 @@
 package iron.object;
 
+import haxe.ds.Vector;
+import iron.math.Vec3;
 import iron.math.Vec2;
 import kha.FastFloat;
 import kha.arrays.Uint32Array;
@@ -211,27 +213,34 @@ class Animation {
 		return 0;
 	}
 
-	public function getBlend2DWeights(actionCoords: Array<Vec2>, sampleCoords: Vec2): Array<FastFloat> {
-		var weights: Array<FastFloat> = [0.0, 0.0, 0.0];
+	public static function getBlend2DWeights(actionCoords: Array<Vec2>, sampleCoords: Vec2): Vec3 {
+		var weights = new Vector<Float>(3);
+		var tempWeights = new Vector<Float>(2);
 
 		// Gradient Band Interpolation
-		var i = 0;
-		for (weight in weights){
+		for (i in 0...3){
 
 			var v1 = new Vec2().setFrom(sampleCoords).sub(actionCoords[i]);
-			var tempWeights = [];
-			for (coord in actionCoords){
-				var v2 = new Vec2().setFrom(coord).sub(actionCoords[i]);
-				var len = v2.length();
-				var w = 1.0 - ((new Vec2().setFrom(v1).dot(v2)) / (len * len));
+			var k = 0;
+			for (j in 0...3){
+				if (i == j) continue;
+				var v2 = new Vec2().setFrom(actionCoords[j]).sub(actionCoords[i]);
+				var len = new Vec2().setFrom(v2).dot(v2);
+				var w = 1.0 - ((new Vec2().setFrom(v1).dot(v2)) / len);
 
-				tempWeights.push(w);				
+				w = w < 0 ? 0 : w > 1.0 ? 1.0 : w;
+				tempWeights.set(k, w);
+				k++;		
 			}
 
-			weights[i] = Math.min(Math.min(w[0], w[1]), w[2]);
+			weights.set(i, Math.min(tempWeights.get(0), tempWeights.get(1)));
 		}
 
-		return weights;
+		var res = new Vec3(weights.get(0), weights.get(1), weights.get(2));
+
+		res.mult(1.0 / (res.x + res.y + res.z));
+
+		return res;
 	}
 
 	#if arm_debug
