@@ -461,84 +461,165 @@ class BoneAnimation extends Animation {
 		m._32 = v1.z;
 	}
 
-	public function blendAction(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Null<Int> = null){
+	function updateAnimSampledRootMotion(anim: TAnimation, m: Mat4, actionParam: Animparams) {
 
-		for(i in 0...actionMats1.length){
+		var track = anim.tracks[0];
+		var sign = actionParam.speed > 0 ? 1 : -1;
 
-			if(skeletonBones[i].bone_layers[layerMask] || layerMask == null) {
-				// Decompose
-				m.setFrom(actionMats1[i]);
-				m1.setFrom(actionMats2[i]);
-				m.decompose(vpos, q1, vscl);
-				m1.decompose(vpos2, q2, vscl2);
-				// Lerp
-				v1.lerp(vpos, vpos2, factor);
-				v2.lerp(vscl, vscl2, factor);
-				q3.lerp(q1, q2, factor);
-				// Compose
-				m2.fromQuat(q3);
-				m2.scale(v2);
-				m2._30 = v1.x;
-				m2._31 = v1.y;
-				m2._32 = v1.z;
-				// Return Result
-				resultMat[i].setFrom(m2);
-			}
-			else {
+		var t = actionParam.time;
+		var tOld = actionParam.timeOld;
+		//t = t < 0 ? 0.1 : t;
+
+		var ti = actionParam.offset;
+		var tiOld = actionParam.offsetOld;
+		//ti = ti < 0 ? 1 : ti;
+
+		var t1 = track.frames[ti] * frameTime;
+		var t2 = track.frames[ti + sign] * frameTime;
+		var s: FastFloat = (t - t1) / (t2 - t1); // Linear
+
+		m1.setF32(track.values, ti * 16); // Offset to 4x4 matrix array
+		m2.setF32(track.values, (ti + sign) * 16);
+
+		// Decompose
+		m1.decompose(vpos, q1, vscl);
+		m2.decompose(vpos2, q2, vscl2);
+
+		// Lerp
+		v1.lerp(vpos, vpos2, s);
+		v2.lerp(vscl, vscl2, s);
+		q3.lerp(q1, q2, s);
+
+		// Compose
+		m.fromQuat(q3);
+		m.scale(v2);
+		m._30 = v1.x;
+		m._31 = v1.y;
+		m._32 = v1.z;
+
+		// Calculate delata for root motion
+		t1 = track.frames[tiOld] * frameTime;
+		t2 = track.frames[tiOld + sign] * frameTime;
+		s = (tOld - t1) / (t2 - t1); // Linear
+
+		m1.setF32(track.values, tiOld * 16); // Offset to 4x4 matrix array
+		m2.setF32(track.values, (tiOld + sign) * 16);
+
+		// Decompose
+		m1.decompose(vpos, q1, vscl);
+		m2.decompose(vpos2, q2, vscl2);
+
+		// Lerp
+		v1.lerp(vpos, vpos2, s);
+
+		m._30 -= v1.x;
+		m._31 -= v1.y;
+		m._32 -= v1.z;
+		
+	}
+
+	public function blendAction(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Null<Int> = null, threshold: FastFloat = 0.1){
+
+		if(factor < threshold) {
+			for(i in 0...actionMats1.length){
 				resultMat[i].setFrom(actionMats1[i]);
+			}
+		}
+		else if(factor > 1.0 - threshold){
+			for(i in 0...actionMats2.length){
+				if(skeletonBones[i].bone_layers[layerMask] || layerMask == null){
+					resultMat[i].setFrom(actionMats2[i]);
+				}
+				else {
+					resultMat[i].setFrom(actionMats1[i]);
+				}
+			}
+		}
+		else {
+			for(i in 0...actionMats1.length){
+
+				if(skeletonBones[i].bone_layers[layerMask] || layerMask == null) {
+					// Decompose
+					m.setFrom(actionMats1[i]);
+					m1.setFrom(actionMats2[i]);
+					m.decompose(vpos, q1, vscl);
+					m1.decompose(vpos2, q2, vscl2);
+					// Lerp
+					v1.lerp(vpos, vpos2, factor);
+					v2.lerp(vscl, vscl2, factor);
+					q3.lerp(q1, q2, factor);
+					// Compose
+					m2.fromQuat(q3);
+					m2.scale(v2);
+					m2._30 = v1.x;
+					m2._31 = v1.y;
+					m2._32 = v1.z;
+					// Return Result
+					resultMat[i].setFrom(m2);
+				}
+				else {
+					resultMat[i].setFrom(actionMats1[i]);
+				}
 			}
 		}
 	}
 
-	public function additiveBlendAction(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Null<Int> = null){
+	public function additiveBlendAction(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Null<Int> = null, threshold: FastFloat = 0.1){
 
-		for(i in 0...baseActionMats.length){
-
-			if(skeletonBones[i].bone_layers[layerMask] || layerMask == null) {
-				// Decompose
-				m.setFrom(baseActionMats[i]);
-				m1.setFrom(addActionMats[i]);
-				bm.setFrom(restPoseMats[i]);
-
-				m.decompose(vpos, q1, vscl);
-				m1.decompose(vpos2, q2, vscl2);
-				bm.decompose(vpos3, q3, vscl3);
-
-				// Add Transforms
-				v1.setFrom(vpos);
-				v2.setFrom(vpos2);
-				v2.sub(vpos3);
-				v2.mult(factor);
-				v1.add(v2);
-
-				// Add Scales
-				vscl2.mult(factor);
-				v2.set(1-factor, 1-factor, 1-factor, 1);
-				v2.add(vscl2);
-				v2.x *= vscl.x;
-				v2.y *= vscl.y;
-				v2.z *= vscl.z;
-				v2.w = 1.0;
-
-				// Add rotations
-				q2.lerp(q3, q2, factor);
-				wm.fromQuat(q3);
-				wm.getInverse(wm);
-				q3.fromMat(wm).normalize();
-				q3.multquats(q3, q2);
-				q3.multquats(q1, q3);
-
-				// Compose
-				m2.fromQuat(q3);
-				m2.scale(v2);
-				m2._30 = v1.x;
-				m2._31 = v1.y;
-				m2._32 = v1.z;
-				// Return Result
-				resultMat[i].setFrom(m2);
-			}
-			else{
+		if(factor < threshold) {
+			for(i in 0...baseActionMats.length){
 				resultMat[i].setFrom(baseActionMats[i]);
+			}
+		}
+		else{
+			for(i in 0...baseActionMats.length){
+
+				if(skeletonBones[i].bone_layers[layerMask] || layerMask == null) {
+					// Decompose
+					m.setFrom(baseActionMats[i]);
+					m1.setFrom(addActionMats[i]);
+					bm.setFrom(restPoseMats[i]);
+
+					m.decompose(vpos, q1, vscl);
+					m1.decompose(vpos2, q2, vscl2);
+					bm.decompose(vpos3, q3, vscl3);
+
+					// Add Transforms
+					v1.setFrom(vpos);
+					v2.setFrom(vpos2);
+					v2.sub(vpos3);
+					v2.mult(factor);
+					v1.add(v2);
+
+					// Add Scales
+					vscl2.mult(factor);
+					v2.set(1-factor, 1-factor, 1-factor, 1);
+					v2.add(vscl2);
+					v2.x *= vscl.x;
+					v2.y *= vscl.y;
+					v2.z *= vscl.z;
+					v2.w = 1.0;
+
+					// Add rotations
+					q2.lerp(q3, q2, factor);
+					wm.fromQuat(q3);
+					wm.getInverse(wm);
+					q3.fromMat(wm).normalize();
+					q3.multquats(q3, q2);
+					q3.multquats(q1, q3);
+
+					// Compose
+					m2.fromQuat(q3);
+					m2.scale(v2);
+					m2._30 = v1.x;
+					m2._31 = v1.y;
+					m2._32 = v1.z;
+					// Return Result
+					resultMat[i].setFrom(m2);
+				}
+				else{
+					resultMat[i].setFrom(baseActionMats[i]);
+				}
 			}
 		}
 	}
@@ -661,7 +742,7 @@ class BoneAnimation extends Animation {
 		return wm;
 	}
 
-	public function solveIKBlend(actionMats: Array<Mat4>, effector: TObj, goal: Vec4, precision = 0.01, maxIterations = 100, chainLenght = 100, pole: Vec4 = null, rollAngle = 0.0, influence = 0.0, layerMask: Null<Int> = null) {
+	public function solveIKBlend(actionMats: Array<Mat4>, effector: TObj, goal: Vec4, precision = 0.01, maxIterations = 100, chainLenght = 100, pole: Vec4 = null, rollAngle = 0.0, influence = 0.0, layerMask: Null<Int> = null, threshold: FastFloat = 0.1) {
 		
 		matsFastBlend = initMatsEmpty();
 
@@ -672,7 +753,7 @@ class BoneAnimation extends Animation {
 		}
 
 		solveIK(effector, goal, precision, maxIterations, chainLenght, pole, rollAngle, actionMats);
-		blendAction(matsFastBlend, actionMats, actionMats, influence, layerMask);
+		blendAction(matsFastBlend, actionMats, actionMats, influence, layerMask, threshold);
 	}
 
 	public function solveIK(effector: TObj, goal: Vec4, precision = 0.01, maxIterations = 100, chainLenght = 100, pole: Vec4 = null, rollAngle = 0.0, actionMats: Array<Mat4> = null ) {
@@ -910,7 +991,7 @@ class BoneAnimation extends Animation {
 		return bone1Res;
 	}
 
-	public function solveTwoBoneIKBlend(actionMats: Array<Mat4>, effector: TObj, goal: Vec4, pole: Vec4 = null, rollAngle = 0.0, influence = 0.0, layerMask: Null<Int> = null) {
+	public function solveTwoBoneIKBlend(actionMats: Array<Mat4>, effector: TObj, goal: Vec4, pole: Vec4 = null, rollAngle = 0.0, influence = 0.0, layerMask: Null<Int> = null, threshold: FastFloat = 0.1) {
 		
 		matsFastBlend = initMatsEmpty();
 
@@ -922,7 +1003,7 @@ class BoneAnimation extends Animation {
 		}
 
 		solveTwoBoneIK(effector, goal, pole, rollAngle, actionMats);
-		blendAction(matsFastBlend, actionMats, actionMats, influence, layerMask);
+		blendAction(matsFastBlend, actionMats, actionMats, influence, layerMask, threshold);
 	}
 
 	public function solveTwoBoneIK(effector: TObj, goal: Vec4, pole: Vec4 = null, rollAngle = 0.0, actionMats : Array<Mat4> = null) {
