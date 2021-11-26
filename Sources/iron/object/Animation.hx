@@ -96,6 +96,8 @@ class Animation {
 				continue;
 			}
 			else {
+				actionParam.timeOld = actionParam.time;
+				actionParam.offsetOld = actionParam.offset;
 				actionParam.setTimeOnly(actionParam.time + delta * actionParam.speed);
 				updateActionTrack(actionParam);
 			}
@@ -140,6 +142,8 @@ class Animation {
 		var track = anim.tracks[0];
 
 		if (frameIndex == -1) {
+			actionParam.timeOld = actionParam.time;
+			actionParam.offsetOld = actionParam.offset;
 			frameIndex = speed > 0 ? 0 : track.frames.length - 1;
 			time = track.frames[frameIndex] * frameTime;
 		}
@@ -167,6 +171,8 @@ class Animation {
 			if (actionParam.loop) {
 				frameIndex = speed > 0 ? 0 : track.frames.length - 1;
 				time = track.frames[frameIndex] * frameTime;
+				actionParam.timeOld = time;
+				actionParam.offsetOld = frameIndex;
 			}
 			else {
 				frameIndex -= sign;
@@ -276,6 +282,8 @@ class Animparams {
 	public var loop: Bool;
 	public var paused: Bool = false;
 	public var onComplete: Array<Void -> Void>;
+	public var timeOld: FastFloat = 0.0;
+	public var offsetOld: Int = 0;
 
 	public inline function setFrameOffset(frameOffset: Int){
 		this.offset = frameOffset;

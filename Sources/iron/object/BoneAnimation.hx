@@ -37,6 +37,7 @@ class BoneAnimation extends Animation {
 
 	var rootMotion: TObj = null;
 	var rootMotionVelocity: Vec4 = null;
+	var rootMotionIndex: Int = null;
 	var oldPos: Vec4 = null;
 	var oldPosWorld: Vec4 = null;
 	var oldTransform: Mat4 = null;
@@ -148,8 +149,9 @@ class BoneAnimation extends Animation {
 
 	public function setRootMotion(bone: TObj){
 		rootMotion = bone;
+		rootMotionIndex = null;
 		oldPos = null;
-		rootMotionVelocity = null;
+		rootMotionVelocity = new Vec4();
 	}
 
 	public function getRootMoptionVelocity(): Vec4 {
@@ -264,22 +266,26 @@ class BoneAnimation extends Animation {
 		(p == null || bi == -1) ? f.setFrom(mats[i]) : f.multmats(fasts[bi], mats[i]);
 	}
 
-	public function evaluateRootMotion(rootName: String, actionMats: Array<Mat4>): Vec4{
-		getBoneIndex(getBone(rootName));
+	public function evaluateRootMotion(actionMats: Array<Mat4>): Vec4{
+		rootMotionIndex = getBoneIndex(rootMotion);
 		var scl = object.parent.transform.scale;
-		if(oldPos == null){
-			rootMotionVelocity = new Vec4();
-			oldPosWorld = getWorldMat(rootMotion, actionMats).getLoc();
-			oldPosWorld = multVecs(oldPosWorld, scl);
-			oldPos = getBoneMat(rootMotion, actionMats).getLoc();
-			return null;
+		var newPos = new Vec4().setFrom(getWorldMat(rootMotion, actionMats).getLoc());
+
+		if(oldPos == null) {
+			oldPos = new Vec4().setFrom(getBoneMat(rootMotion, actionMats).getLoc());
+			actionMats[rootMotionIndex]._30 += oldPos.x;
+			actionMats[rootMotionIndex]._31 += oldPos.y;
+			actionMats[rootMotionIndex]._32 += oldPos.z;
+
+			return rootMotionVelocity;
 		}
-		var newPos = getWorldMat(rootMotion, actionMats).getLoc();
+
+		actionMats[rootMotionIndex]._30 = oldPos.x;
+		actionMats[rootMotionIndex]._31 = oldPos.y;
+		actionMats[rootMotionIndex]._32 = oldPos.z;
+
 		newPos = multVecs(newPos, scl);
-		rootMotionVelocity = new Vec4().setFrom(newPos);
-		rootMotionVelocity.sub(oldPosWorld);
-		oldPosWorld.setFrom(newPos);
-		getBoneMat(rootMotion, actionMats).setLoc(oldPos);
+		rootMotionVelocity.setFrom(newPos);
 		return new Vec4().setFrom(rootMotionVelocity);
 		
 	}
@@ -410,8 +416,12 @@ class BoneAnimation extends Animation {
 	public function sampleAction(actionParam: Animparams, anctionMats: Array<Mat4>){
 		var bones = data.geom.actions.get(actionParam.action);
 		for (i in 0...bones.length) {
-			
-			updateAnimSampled(bones[i].anim, anctionMats[i], actionParam);
+			if (i == rootMotionIndex){
+				updateAnimSampledRootMotion(bones[i].anim, anctionMats[i], actionParam);
+			}
+			else {
+				updateAnimSampled(bones[i].anim, anctionMats[i], actionParam);
+			}
 		}
 
 	}
