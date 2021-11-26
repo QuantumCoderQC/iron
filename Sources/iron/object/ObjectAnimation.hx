@@ -76,7 +76,7 @@ class ObjectAnimation extends Animation {
 
 	public function initTransformMap(){
 
-		var map = new Map<String, FastFloat>();
+		var map = new Map<String, Null<FastFloat>>();
 		for (name in trackNames){
 			map.set(name, null);
 		}
@@ -137,13 +137,19 @@ class ObjectAnimation extends Animation {
 
 		for(track in transformMapRes.keys()){
 
-			var tempValue = (1.0 - factor) * transformMap1.get(track) + factor * transformMap2.get(track);
+			var v1 = transformMap1.get(track);
+			var v2 = transformMap2.get(track);
+
+			if(v1 == null || v2 == null) continue;
+
+			var maxVal: FastFloat = 1.0;
+			var tempValue = (maxVal - factor) * v1 + factor * v2;
 			transformMapRes.set(track, tempValue);
 		}
 		
 	}
 
-	inline function interpolateLinear(t: FastFloat, t1: FastFloat, t2: FastFloat, v1: FastFloat, v2: FastFloat): FastFloat {
+	inline function interpolateLinear(t: FastFloat, t1: FastFloat, t2: FastFloat, v1: FastFloat, v2: FastFloat): Null<FastFloat> {
 		var s = (t - t1) / (t2 - t1);
 		return (1.0 - s) * v1 + s * v2;
 	}

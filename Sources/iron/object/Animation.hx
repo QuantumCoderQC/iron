@@ -292,7 +292,8 @@ class Animparams {
 
 	public inline function setTimeOffset(timeOffset: FastFloat){
 		this.time = timeOffset;
-		this.offset = Std.int(time / Scene.active.raw.frame_time);
+		var ftime: FastFloat = Scene.active.raw.frame_time;
+		this.offset = Std.int(time / ftime);
 	}
 
 	public inline function restartAction() {

@@ -37,7 +37,7 @@ class BoneAnimation extends Animation {
 
 	var rootMotion: TObj = null;
 	var rootMotionVelocity: Vec4 = null;
-	var rootMotionIndex: Int = null;
+	var rootMotionIndex: Null<Int> = null;
 	var oldPos: Vec4 = null;
 	var oldPosWorld: Vec4 = null;
 	var oldTransform: Mat4 = null;
