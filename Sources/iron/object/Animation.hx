@@ -116,7 +116,7 @@ class Animation {
 		
 	}
 
-	function isTrackEnd(track: TTrack, frameIndex: Int, speed: FastFloat): Bool {
+	inline function isTrackEnd(track: TTrack, frameIndex: Int, speed: FastFloat): Bool {
 		return speed > 0 ?
 			frameIndex >= track.frames.length - 1 :
 			frameIndex <= 0;
@@ -215,7 +215,7 @@ class Animation {
 		return Std.int(time / frameTime);
 	}
 
-	public function totalFrames(): Int {
+	public function getTotalFrames(): Int {
 		return 0;
 	}
 

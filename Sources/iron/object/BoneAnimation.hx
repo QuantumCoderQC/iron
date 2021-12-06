@@ -682,9 +682,9 @@ class BoneAnimation extends Animation {
 
 	}
 
-	public override function totalFrames(): Int {
-		if (skeletonBones == null) return 0;
-		var track = skeletonBones[0].anim.tracks[0];
+	public override function totalFrames(actionParam: Animparams): Int {
+		var bones = data.geom.actions.get(actionParam.action);
+		var track = bones[0].anim.tracks[0];
 		return Std.int(track.frames[track.frames.length - 1] - track.frames[0]);
 	}
 
