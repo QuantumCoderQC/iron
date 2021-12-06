@@ -74,7 +74,7 @@ class ObjectAnimation extends Animation {
 		#end
 	}
 
-	public override function totalFrames(actionParam: Animparams): Int {
+	public override function getTotalFrames(actionParam: Animparams): Int {
 		var track = getAction(actionParam.action).anim.tracks[0];
 		return Std.int(track.frames[track.frames.length - 1] - track.frames[0]);
 	}

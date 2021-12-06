@@ -215,7 +215,7 @@ class Animation {
 		return Std.int(time / frameTime);
 	}
 
-	public function getTotalFrames(): Int {
+	public function getTotalFrames(actionParam: Animparams): Int {
 		return 0;
 	}
 
