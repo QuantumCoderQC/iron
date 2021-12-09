@@ -38,6 +38,9 @@ class BoneAnimation extends Animation {
 	var rootMotion: TObj = null;
 	var rootMotionVelocity: Vec4 = null;
 	var rootMotionIndex: Null<Int> = null;
+	var rootMotionLockX: Bool = false;
+	var rootMotionLockY: Bool = false;
+	var rootMotionLockZ: Bool = false;
 	var oldPos: Vec4 = null;
 	var oldPosWorld: Vec4 = null;
 	var oldTransform: Mat4 = null;
@@ -147,10 +150,13 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	public function setRootMotion(bone: TObj){
+	public function setRootMotion(bone: TObj, lockX: Bool = false, lockY: Bool = false, lockZ: Bool = false){
 		rootMotion = bone;
 		rootMotionIndex = null;
 		oldPos = null;
+		rootMotionLockX	= lockX;
+		rootMotionLockY	= lockY;
+		rootMotionLockZ	= lockZ;
 		rootMotionVelocity = new Vec4();
 	}
 
@@ -273,10 +279,6 @@ class BoneAnimation extends Animation {
 
 		if(oldPos == null) {
 			oldPos = new Vec4().setFrom(getBoneMat(rootMotion, actionMats).getLoc());
-			actionMats[rootMotionIndex]._30 += oldPos.x;
-			actionMats[rootMotionIndex]._31 += oldPos.y;
-			actionMats[rootMotionIndex]._32 += oldPos.z;
-
 			return rootMotionVelocity;
 		}
 
@@ -474,6 +476,13 @@ class BoneAnimation extends Animation {
 		var tiOld = actionParam.offsetOld;
 		//ti = ti < 0 ? 1 : ti;
 
+		
+		if(tiOld > track.frames.length - 2){
+			ti = track.frames.length - 2;
+			t = track.frames[ti + sign] * frameTime;
+			tiOld = ti;
+		}
+
 		var t1 = track.frames[ti] * frameTime;
 		var t2 = track.frames[ti + sign] * frameTime;
 		var s: FastFloat = (t - t1) / (t2 - t1); // Linear
@@ -554,6 +563,11 @@ class BoneAnimation extends Animation {
 					m2._30 = v1.x;
 					m2._31 = v1.y;
 					m2._32 = v1.z;
+					if(i == rootMotionIndex){
+						m2._30 = rootMotionLockX ? vpos2.x : m2._30;
+						m2._31 = rootMotionLockY ? vpos2.y : m2._31;
+						m2._32 = rootMotionLockZ ? vpos2.z : m2._32;
+					}
 					// Return Result
 					resultMat[i].setFrom(m2);
 				}
