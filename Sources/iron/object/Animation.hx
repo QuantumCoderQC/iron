@@ -159,7 +159,7 @@ class Animation {
 					if (frameIndex == anim.marker_frames[i]) {
 						var marketAct = markerEvents.get(actionParam);
 						var ar = marketAct.get(anim.marker_names[i]);
-						for (f in ar) f();
+						if (ar != null) for (f in ar) f();
 					}
 				}
 				lastFrameIndex = frameIndex;
@@ -169,10 +169,9 @@ class Animation {
 		// End of track
 		if (isTrackEnd(track, frameIndex, speed)) {
 			if (actionParam.loop) {
+				actionParam.offsetOld = frameIndex;
 				frameIndex = speed > 0 ? 0 : track.frames.length - 1;
 				time = track.frames[frameIndex] * frameTime;
-				actionParam.timeOld = time;
-				actionParam.offsetOld = frameIndex;
 			}
 			else {
 				frameIndex -= sign;
