@@ -111,11 +111,14 @@ class Transform {
 
 	function composeDelta() {
 		// Delta transform
-		dloc.addvecs(loc, dloc);
-		dscale.addvecs(dscale, scale);
-		drot.fromEuler(_deulerX, _deulerY, _deulerZ);
-		drot.multquats(rot, drot);
-		local.compose(dloc, drot, dscale);
+		var dl = new Vec4().addvecs(loc, dloc);
+		var ds = new Vec4().setFrom(scale);
+		ds.x *= dscale.x;
+		ds.y *= dscale.y;
+		ds.z *= dscale.z;
+		var dr = new Quat().fromEuler(_deulerX, _deulerY, _deulerZ);
+		dr.multquats(rot, dr);
+		local.compose(dl, dr, ds);
 	}
 
 	/**
