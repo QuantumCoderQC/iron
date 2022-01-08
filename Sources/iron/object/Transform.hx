@@ -109,6 +109,26 @@ class Transform {
 		if (dirty) buildMatrix();
 	}
 
+	/**
+		Clear delta transforms. `dloc`, `drot` and `dscale` are set to `null`
+	**/
+	public function clearDelta() {
+
+		dloc = null;
+		drot = null;
+		dscale = null;
+	}
+
+	/**
+		Reset delta transforms. `dloc`, `drot` and `dscale` 
+		are set to `Vec4(0, 0, 0)`, `Quat(0, 0, 0, 0)` and `Vec4(1, 1, 1)` respectively
+	**/
+	public function resetDelta() {
+		dloc = new Vec4();
+		drot = new Quat();
+		dscale = new Vec4().set(1, 1, 1);
+	}
+
 	function composeDelta() {
 		// Delta transform
 		var dl = new Vec4().addvecs(loc, dloc);
