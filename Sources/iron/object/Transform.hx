@@ -126,6 +126,7 @@ class Transform {
 	public function resetDelta() {
 		dloc = new Vec4();
 		drot = new Quat();
+		_deulerX = _deulerY = _deulerZ = 0.0;
 		dscale = new Vec4().set(1, 1, 1);
 	}
 
@@ -137,7 +138,8 @@ class Transform {
 		ds.y *= dscale.y;
 		ds.z *= dscale.z;
 		var dr = new Quat().fromEuler(_deulerX, _deulerY, _deulerZ);
-		dr.multquats(rot, dr);
+		dr.multquats(dr, rot);
+		dr.multquats(drot, dr);
 		local.compose(dl, dr, ds);
 	}
 
