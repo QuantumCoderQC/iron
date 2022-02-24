@@ -1,6 +1,6 @@
 package iron.object;
 
-import iron.object.Animation.Animparams;
+import iron.object.Animation.ActionSampler;
 
 import kha.arrays.Float32Array;
 import kha.FastFloat;
@@ -74,8 +74,8 @@ class ObjectAnimation extends Animation {
 		#end
 	}
 
-	public override function getTotalFrames(actionParam: Animparams): Int {
-		var track = getAction(actionParam.action).anim.tracks[0];
+	public override function getTotalFrames(sampler: ActionSampler): Int {
+		var track = getAction(sampler.action).anim.tracks[0];
 		return Std.int(track.frames[track.frames.length - 1] - track.frames[0]);
 	}
 
@@ -101,22 +101,22 @@ class ObjectAnimation extends Animation {
 		object.transform.buildMatrix();
 	}
 
-	override public function updateActionTrack(actionParam: Animparams) {
-		if(actionParam.paused) return;
-		oaction = getAction(actionParam.action);
-		updateTrack(oaction.anim, actionParam);
+	override public function updateActionTrack(sampler: ActionSampler) {
+		if(sampler.paused) return;
+		oaction = getAction(sampler.action);
+		updateTrack(oaction.anim, sampler);
 
 	}
 
-	function updateAnimSampled(anim: TAnimation, transformMap: Map<String, FastFloat>, actionParam: Animparams) {
+	function updateAnimSampled(anim: TAnimation, transformMap: Map<String, FastFloat>, sampler: ActionSampler) {
 
 		for (track in anim.tracks) {
-			var sign = actionParam.speed > 0 ? 1 : -1;
+			var sign = sampler.speed > 0 ? 1 : -1;
 
-			var t = actionParam.time;
+			var t = sampler.time;
 			//t = t < 0 ? 0.1 : t;
 
-			var ti = actionParam.offset;
+			var ti = sampler.offset;
 			//ti = ti < 0 ? 1 : ti;
 
 			var t1 = track.frames[ti] * frameTime;
@@ -132,10 +132,10 @@ class ObjectAnimation extends Animation {
 		}
 	}
 
-	public function sampleAction(actionParam: Animparams, transformMap: Map<String, FastFloat>){
-		var objanim = getAction(actionParam.action);
+	public function sampleAction(sampler: ActionSampler, transformMap: Map<String, FastFloat>){
+		var objanim = getAction(sampler.action);
 			
-		updateAnimSampled(objanim.anim, transformMap, actionParam);
+		updateAnimSampled(objanim.anim, transformMap, sampler);
 	}
 
 	public function blendActionObject(transformMap1: Map<String, FastFloat>, transformMap2: Map<String, FastFloat>, transformMapRes: Map<String, FastFloat>, factor: FastFloat ) {

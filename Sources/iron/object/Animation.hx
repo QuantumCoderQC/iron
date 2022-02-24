@@ -45,9 +45,9 @@ class Animation {
 	var blendFactor: FastFloat = 0.0;
 
 	var lastFrameIndex = -1;
-	var markerEvents: Map<Animparams, Map<String, Array<Void->Void>>> = null;
+	var markerEvents: Map<ActionSampler, Map<String, Array<Void->Void>>> = null;
 
-	public var activeActions: Map<String, Animparams> = null;
+	public var activeActions: Map<String, ActionSampler> = null;
 
 	function new() {
 		Scene.active.animations.push(this);
@@ -84,30 +84,30 @@ class Animation {
 		Scene.active.animations.remove(this);
 	}
 
-	public function updateActionTrack(actionParam: Animparams){
+	public function updateActionTrack(sampler: ActionSampler){
 		return;
 	}
 
 	public function update(delta: FastFloat) {
 		if(activeActions == null) return;
 
-		for(actionParam in activeActions){
-			if (actionParam.paused || actionParam.speed == 0.0) {
+		for(sampler in activeActions){
+			if (sampler.paused || sampler.speed == 0.0) {
 				continue;
 			}
 			else {
-				actionParam.timeOld = actionParam.time;
-				actionParam.offsetOld = actionParam.offset;
-				actionParam.setTimeOnly(actionParam.time + delta * actionParam.speed);
-				updateActionTrack(actionParam);
+				sampler.timeOld = sampler.time;
+				sampler.offsetOld = sampler.offset;
+				sampler.setTimeOnly(sampler.time + delta * sampler.speed);
+				updateActionTrack(sampler);
 			}
 		}
 		
 	}
 
-	public function registerAction(actionID: String, actionParam: Animparams){
+	public function registerAction(actionID: String, sampler: ActionSampler){
 		if (activeActions == null) activeActions = new Map();
-		activeActions.set(actionID, actionParam);
+		activeActions.set(actionID, sampler);
 	}
 
 	public function deRegisterAction(actionID: String) {
@@ -133,17 +133,17 @@ class Animation {
 		time = track.frames[frameIndex] * frameTime;
 	}
 
-	function updateTrack(anim: TAnimation, actionParam: Animparams) {
+	function updateTrack(anim: TAnimation, sampler: ActionSampler) {
 
-		var time = actionParam.time;
-		var frameIndex = actionParam.offset;
-		var speed = actionParam.speed;
+		var time = sampler.time;
+		var frameIndex = sampler.offset;
+		var speed = sampler.speed;
 
 		var track = anim.tracks[0];
 
 		if (frameIndex == -1) {
-			actionParam.timeOld = actionParam.time;
-			actionParam.offsetOld = actionParam.offset;
+			sampler.timeOld = sampler.time;
+			sampler.offsetOld = sampler.offset;
 			frameIndex = speed > 0 ? 0 : track.frames.length - 1;
 			time = track.frames[frameIndex] * frameTime;
 		}
@@ -154,10 +154,10 @@ class Animation {
 
 		// Marker events
 		if (markerEvents != null && anim.marker_names != null && frameIndex != lastFrameIndex) {
-			if(markerEvents.get(actionParam) != null){
+			if(markerEvents.get(sampler) != null){
 				for (i in 0...anim.marker_frames.length) {
 					if (frameIndex == anim.marker_frames[i]) {
-						var marketAct = markerEvents.get(actionParam);
+						var marketAct = markerEvents.get(sampler);
 						var ar = marketAct.get(anim.marker_names[i]);
 						if (ar != null) for (f in ar) f();
 					}
@@ -168,31 +168,31 @@ class Animation {
 
 		// End of track
 		if (isTrackEnd(track, frameIndex, speed)) {
-			if (actionParam.loop) {
-				actionParam.offsetOld = frameIndex;
+			if (sampler.loop) {
+				sampler.offsetOld = frameIndex;
 				frameIndex = speed > 0 ? 0 : track.frames.length - 1;
 				time = track.frames[frameIndex] * frameTime;
 			}
 			else {
 				frameIndex -= sign;
-				actionParam.paused = true;
+				sampler.paused = true;
 			}
-			if (actionParam.onComplete != null) for(func in actionParam.onComplete){ func();};
+			if (sampler.onComplete != null) for(func in sampler.onComplete){ func();};
 		}
 
-		actionParam.setFrameOffsetOnly(frameIndex);
-		actionParam.speed = speed;
-		actionParam.setTimeOnly(time);
+		sampler.setFrameOffsetOnly(frameIndex);
+		sampler.speed = speed;
+		sampler.setTimeOnly(time);
 
 	}
 
-	public function notifyOnMarker(actionParam: Animparams, name: String, onMarker: Void->Void) {
+	public function notifyOnMarker(sampler: ActionSampler, name: String, onMarker: Void->Void) {
 		if (markerEvents == null) markerEvents = new Map();
 
-		var markerAct = markerEvents.get(actionParam);
+		var markerAct = markerEvents.get(sampler);
 		if(markerAct == null){
 			markerAct = new Map();
-			markerEvents.set(actionParam, markerAct);
+			markerEvents.set(sampler, markerAct);
 		}
 
 		var ar = markerAct.get(name);
@@ -203,8 +203,8 @@ class Animation {
 		ar.push(onMarker);
 	}
 
-	public function removeMarker(actionParam: Animparams, name: String, onMarker: Void->Void) {
-		var markerAct = markerEvents.get(actionParam);
+	public function removeMarker(sampler: ActionSampler, name: String, onMarker: Void->Void) {
+		var markerAct = markerEvents.get(sampler);
 		if(markerAct == null) return;
 
 		markerAct.get(name).remove(onMarker);
@@ -214,7 +214,7 @@ class Animation {
 		return Std.int(time / frameTime);
 	}
 
-	public function getTotalFrames(actionParam: Animparams): Int {
+	public function getTotalFrames(sampler: ActionSampler): Int {
 		return 0;
 	}
 
@@ -264,7 +264,7 @@ class Animation {
 	#end
 }
 
-class Animparams {
+class ActionSampler {
 
 	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, onComplete: Array<Void -> Void> = null) {
 

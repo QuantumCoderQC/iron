@@ -1,6 +1,6 @@
 package iron.object;
 
-import iron.object.Animation.Animparams;
+import iron.object.Animation.ActionSampler;
 #if arm_skin
 
 import kha.FastFloat;
@@ -206,7 +206,7 @@ class BoneAnimation extends Animation {
 		super.play(action, onComplete, blendTime, speed, loop);
 		if (action != "") {
 			setAction(action);
-			var tempAnimParam = new Animparams(action);
+			var tempAnimParam = new ActionSampler(action);
 			registerAction("tempAction", tempAnimParam);
 			updateAnimation = function(mats){
 				sampleAction(tempAnimParam, mats);
@@ -404,39 +404,39 @@ class BoneAnimation extends Animation {
 		updateAnimation = f;
 	}
 
-	override public function updateActionTrack(actionParam: Animparams) {
-		if(actionParam.paused) return;
-		var bones = data.geom.actions.get(actionParam.action);
+	override public function updateActionTrack(sampler: ActionSampler) {
+		if(sampler.paused) return;
+		var bones = data.geom.actions.get(sampler.action);
 		for(b in bones){
 			if (b.anim != null) {
-				updateTrack(b.anim, actionParam);
+				updateTrack(b.anim, sampler);
 				break;
 			}
 		}
 	}
 
-	public function sampleAction(actionParam: Animparams, anctionMats: Array<Mat4>){
-		var bones = data.geom.actions.get(actionParam.action);
+	public function sampleAction(sampler: ActionSampler, anctionMats: Array<Mat4>){
+		var bones = data.geom.actions.get(sampler.action);
 		for (i in 0...bones.length) {
 			if (i == rootMotionIndex){
-				updateAnimSampledRootMotion(bones[i].anim, anctionMats[i], actionParam);
+				updateAnimSampledRootMotion(bones[i].anim, anctionMats[i], sampler);
 			}
 			else {
-				updateAnimSampled(bones[i].anim, anctionMats[i], actionParam);
+				updateAnimSampled(bones[i].anim, anctionMats[i], sampler);
 			}
 		}
 
 	}
 
-	function updateAnimSampled(anim: TAnimation, m: Mat4, actionParam: Animparams) {
+	function updateAnimSampled(anim: TAnimation, m: Mat4, sampler: ActionSampler) {
 
 		var track = anim.tracks[0];
-		var sign = actionParam.speed > 0 ? 1 : -1;
+		var sign = sampler.speed > 0 ? 1 : -1;
 
-		var t = actionParam.time;
+		var t = sampler.time;
 		//t = t < 0 ? 0.1 : t;
 
-		var ti = actionParam.offset;
+		var ti = sampler.offset;
 		//ti = ti < 0 ? 1 : ti;
 
 		var t1 = track.frames[ti] * frameTime;
@@ -463,17 +463,17 @@ class BoneAnimation extends Animation {
 		m._32 = v1.z;
 	}
 
-	function updateAnimSampledRootMotion(anim: TAnimation, m: Mat4, actionParam: Animparams) {
+	function updateAnimSampledRootMotion(anim: TAnimation, m: Mat4, sampler: ActionSampler) {
 
 		var track = anim.tracks[0];
-		var sign = actionParam.speed > 0 ? 1 : -1;
+		var sign = sampler.speed > 0 ? 1 : -1;
 
-		var t = actionParam.time;
-		var tOld = actionParam.timeOld;
+		var t = sampler.time;
+		var tOld = sampler.timeOld;
 		//t = t < 0 ? 0.1 : t;
 
-		var ti = actionParam.offset;
-		var tiOld = actionParam.offsetOld;
+		var ti = sampler.offset;
+		var tiOld = sampler.offsetOld;
 		//ti = ti < 0 ? 1 : ti;
 
 		
@@ -696,8 +696,8 @@ class BoneAnimation extends Animation {
 
 	}
 
-	public override function getTotalFrames(actionParam: Animparams): Int {
-		var bones = data.geom.actions.get(actionParam.action);
+	public override function getTotalFrames(sampler: ActionSampler): Int {
+		var bones = data.geom.actions.get(sampler.action);
 		var track = bones[0].anim.tracks[0];
 		return Std.int(track.frames[track.frames.length - 1] - track.frames[0]);
 	}
