@@ -739,13 +739,6 @@ class Scene {
 						}
 						// Create new one
 						if (armature == null) {
-							// Unique name if armature was already instantiated for different object
-							for (a in armatures) {
-								if (a.name == parent.name) {
-									parent.name += "." + parent.uid;
-									break;
-								}
-							}
 							armature = new Armature(parent.uid, parent.name, bactions);
 							armatures.push(armature);
 						}

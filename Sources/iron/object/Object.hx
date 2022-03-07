@@ -204,12 +204,12 @@ class Object {
 	}
 
 	#if arm_skin
-	public function getParentArmature(name: String): BoneAnimation {
-		for (a in Scene.active.animations) if (a.armature != null && a.armature.name == name) return cast a;
+	public function getBoneAnimation(armatureUid): BoneAnimation {
+		for (a in Scene.active.animations) if (a.armature != null && a.armature.uid == armatureUid) return cast a;
 		return null;
 	}
 	#else
-	public function getParentArmature(name: String): Animation {
+	public function getBoneAnimation(armatureUid): Animation {
 		return null;
 	}
 	#end
@@ -219,7 +219,7 @@ class Object {
 		#if arm_skin
 		if (raw.parent_bone != null) {
 			Scene.active.notifyOnInit(function() {
-				var banim = getParentArmature(parent.name);
+				var banim = getBoneAnimation(parent.uid);
 				if (banim != null) banim.addBoneChild(raw.parent_bone, this);
 			});
 		}

@@ -72,11 +72,11 @@ class BoneAnimation extends Animation {
 	static var v1 = new Vec4();
 	static var v2 = new Vec4();
 
-	public function new(armatureName = "") {
+	public function new(armatureUid: Int) {
 		super();
 		this.isSampled = false;
 		for (a in Scene.active.armatures) {
-			if (a.name == armatureName) {
+			if (a.uid == armatureUid) {
 				this.armature = a;
 				break;
 			}
