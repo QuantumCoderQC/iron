@@ -392,7 +392,6 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	// Do inverse kinematics here
 	var onUpdates: Array<Void->Void> = null;
 	public function notifyOnUpdate(f: Void->Void) {
 		if (onUpdates == null) onUpdates = [];
@@ -756,20 +755,6 @@ class BoneAnimation extends Animation {
 		return wm;
 	}
 
-	public function solveIKBlend(actionMats: Array<Mat4>, effector: TObj, goal: Vec4, precision = 0.01, maxIterations = 100, chainLenght = 100, pole: Vec4 = null, rollAngle = 0.0, influence = 0.0, layerMask: Null<Int> = null, threshold: FastFloat = 0.1) {
-		
-		matsFastBlend = initMatsEmpty();
-
-		var i = 0;
-		for (mat in matsFastBlend){
-			mat.setFrom(actionMats[i]);
-			i++;
-		}
-
-		solveIK(effector, goal, precision, maxIterations, chainLenght, pole, rollAngle, actionMats);
-		blendAction(matsFastBlend, actionMats, actionMats, influence, layerMask, threshold);
-	}
-
 	public function solveIK(effector: TObj, goal: Vec4, precision = 0.01, maxIterations = 100, chainLenght = 100, pole: Vec4 = null, rollAngle = 0.0, actionMats: Array<Mat4> = null ) {
 		if(actionMats == null) actionMats = skeletonMats;
 		
@@ -1005,21 +990,6 @@ class BoneAnimation extends Animation {
 		return bone1Res;
 	}
 
-	public function solveTwoBoneIKBlend(actionMats: Array<Mat4>, effector: TObj, goal: Vec4, pole: Vec4 = null, rollAngle = 0.0, influence = 0.0, layerMask: Null<Int> = null, threshold: FastFloat = 0.1) {
-		
-		matsFastBlend = initMatsEmpty();
-
-		var i = 0;
-		for (mat in matsFastBlend){
-			mat.setFrom(actionMats[i]);
-			//skeletonMats[i].setFrom(actionMats[i]);
-			i++;
-		}
-
-		solveTwoBoneIK(effector, goal, pole, rollAngle, actionMats);
-		blendAction(matsFastBlend, actionMats, actionMats, influence, layerMask, threshold);
-	}
-
 	public function solveTwoBoneIK(effector: TObj, goal: Vec4, pole: Vec4 = null, rollAngle = 0.0, actionMats : Array<Mat4> = null) {
 		if(actionMats == null) actionMats = skeletonMats;
 		
@@ -1192,5 +1162,4 @@ class BoneAnimation extends Animation {
 		getBoneMat(bone, actionMats).setFrom(tempMat);
 	}
 }
-
 #end
