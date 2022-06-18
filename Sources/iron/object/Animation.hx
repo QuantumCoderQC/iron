@@ -218,36 +218,6 @@ class Animation {
 		return 0;
 	}
 
-	public static function getBlend2DWeights(actionCoords: Array<Vec2>, sampleCoords: Vec2): Vec3 {
-		var weights = new Vector<Float>(3);
-		var tempWeights = new Vector<Float>(2);
-
-		// Gradient Band Interpolation
-		for (i in 0...3){
-
-			var v1 = new Vec2().setFrom(sampleCoords).sub(actionCoords[i]);
-			var k = 0;
-			for (j in 0...3){
-				if (i == j) continue;
-				var v2 = new Vec2().setFrom(actionCoords[j]).sub(actionCoords[i]);
-				var len = new Vec2().setFrom(v2).dot(v2);
-				var w = 1.0 - ((new Vec2().setFrom(v1).dot(v2)) / len);
-
-				w = w < 0 ? 0 : w > 1.0 ? 1.0 : w;
-				tempWeights.set(k, w);
-				k++;		
-			}
-
-			weights.set(i, Math.min(tempWeights.get(0), tempWeights.get(1)));
-		}
-
-		var res = new Vec3(weights.get(0), weights.get(1), weights.get(2));
-
-		res.mult(1.0 / (res.x + res.y + res.z));
-
-		return res;
-	}
-
 	#if arm_debug
 	public static var animationTime = 0.0;
 	static var startTime = 0.0;
