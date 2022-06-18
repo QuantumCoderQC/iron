@@ -214,6 +214,11 @@ class Object {
 	}
 	#end
 
+	public function getObjectAnimation(): ObjectAnimation {
+		if(animation != null) return cast animation;
+		return null;
+	}
+
 	public function setupAnimation(oactions: Array<TSceneFormat> = null) {
 		// Parented to bone
 		#if arm_skin
