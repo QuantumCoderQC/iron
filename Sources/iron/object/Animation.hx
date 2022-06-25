@@ -236,12 +236,13 @@ class Animation {
 
 class ActionSampler {
 
-	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, onComplete: Array<Void -> Void> = null) {
+	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, startPaused: Bool = false, onComplete: Array<Void -> Void> = null) {
 
 		this.action = action;
 		this.speed = speed;
 		this.loop = loop;
 		this.onComplete = onComplete;
+		this.paused = startPaused;
 	}
 
 	public var action(default, null): String;
