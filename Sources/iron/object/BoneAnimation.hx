@@ -526,7 +526,7 @@ class BoneAnimation extends Animation {
 		
 	}
 
-	public function blendAction(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Null<Int> = null, threshold: FastFloat = 0.1){
+	public function blendAction(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = -1, threshold: FastFloat = 0.1){
 
 		if(factor < threshold) {
 			for(i in 0...actionMats1.length){
@@ -535,7 +535,7 @@ class BoneAnimation extends Animation {
 		}
 		else if(factor > 1.0 - threshold){
 			for(i in 0...actionMats2.length){
-				if(skeletonBones[i].bone_layers[layerMask] || layerMask == null){
+				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0){
 					resultMat[i].setFrom(actionMats2[i]);
 				}
 				else {
@@ -546,7 +546,7 @@ class BoneAnimation extends Animation {
 		else {
 			for(i in 0...actionMats1.length){
 
-				if(skeletonBones[i].bone_layers[layerMask] || layerMask == null) {
+				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0) {
 					// Decompose
 					m.setFrom(actionMats1[i]);
 					m1.setFrom(actionMats2[i]);
@@ -577,7 +577,7 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	public function additiveBlendAction(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Null<Int> = null, threshold: FastFloat = 0.1){
+	public function additiveBlendAction(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Int = -1, threshold: FastFloat = 0.1){
 
 		if(factor < threshold) {
 			for(i in 0...baseActionMats.length){
@@ -587,7 +587,7 @@ class BoneAnimation extends Animation {
 		else{
 			for(i in 0...baseActionMats.length){
 
-				if(skeletonBones[i].bone_layers[layerMask] || layerMask == null) {
+				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0) {
 					// Decompose
 					m.setFrom(baseActionMats[i]);
 					m1.setFrom(addActionMats[i]);
