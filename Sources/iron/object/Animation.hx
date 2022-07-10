@@ -236,15 +236,6 @@ class Animation {
 
 class ActionSampler {
 
-	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, startPaused: Bool = false, onComplete: Array<Void -> Void> = null) {
-
-		this.action = action;
-		this.speed = speed;
-		this.loop = loop;
-		this.onComplete = onComplete;
-		this.paused = startPaused;
-	}
-
 	public var action(default, null): String;
 	public var time(default, null): FastFloat = 0.0;
 	public var offset(default, null): Int = 0; // Frames to offset
@@ -254,6 +245,15 @@ class ActionSampler {
 	public var onComplete: Array<Void -> Void>;
 	public var timeOld: FastFloat = 0.0;
 	public var offsetOld: Int = 0;
+
+	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, startPaused: Bool = false, onComplete: Array<Void -> Void> = null) {
+
+		this.action = action;
+		this.speed = speed;
+		this.loop = loop;
+		this.onComplete = onComplete;
+		this.paused = startPaused;
+	}
 
 	public inline function setFrameOffset(frameOffset: Int){
 		this.offset = frameOffset;

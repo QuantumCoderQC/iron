@@ -83,6 +83,13 @@ class BoneAnimation extends Animation {
 		}
 	}
 
+	public function initMatsEmpty(): Array<Mat4> {
+
+		var mats = [];
+		for(i in 0...skeletonMats.length) mats.push(Mat4.identity());
+		return mats;
+	}
+	
 	public inline function getNumBones(): Int {
 		if (skeletonBones == null) return 0;
 		return skeletonBones.length;
@@ -150,20 +157,6 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	public function setRootMotion(bone: TObj, lockX: Bool = false, lockY: Bool = false, lockZ: Bool = false){
-		rootMotion = bone;
-		rootMotionIndex = null;
-		oldPos = null;
-		rootMotionLockX	= lockX;
-		rootMotionLockY	= lockY;
-		rootMotionLockZ	= lockZ;
-		rootMotionVelocity = new Vec4();
-	}
-
-	public function getRootMoptionVelocity(): Vec4 {
-		return rootMotionVelocity;
-	}
-
 	function numParents(b: TObj): Int {
 		var i = 0;
 		var p = b.parent;
@@ -202,6 +195,33 @@ class BoneAnimation extends Animation {
 		setMats();
 	}
 
+	function multParent(i: Int, fasts: Array<Mat4>, bones: Array<TObj>, mats: Array<Mat4>) {
+		var f = fasts[i];
+		if (applyParent != null && !applyParent[i]) {
+			f.setFrom(mats[i]);
+			return;
+		}
+		var p = bones[i].parent;
+		var bi = getBoneIndex(p, bones);
+		(p == null || bi == -1) ? f.setFrom(mats[i]) : f.multmats(fasts[bi], mats[i]);
+	}
+
+	inline function multVecs(vec1: Vec4, vec2: Vec4): Vec4 {
+		var res = new Vec4().setFrom(vec1);
+		res.x *= vec2.x;
+		res.y *= vec2.y;
+		res.z *= vec2.z;
+		res.w *= vec2.w;
+
+		return res;
+
+	}
+
+	// Do animation here
+	public function setAnimationLoop(f: Array<Mat4>->Void) {
+		updateAnimation = f;
+	}
+
 	override public function play(action = "", onComplete: Void->Void = null, blendTime = 0.2, speed = 1.0, loop = true) {
 		super.play(action, onComplete, blendTime, speed, loop);
 		if (action != "") {
@@ -212,13 +232,6 @@ class BoneAnimation extends Animation {
 				sampleAction(tempAnimParam, mats);
 			}
 		}
-	}
-
-	public function initMatsEmpty(): Array<Mat4> {
-
-		var mats = [];
-		for(i in 0...skeletonMats.length) mats.push(Mat4.identity());
-		return mats;
 	}
 
 	override public function update(delta: FastFloat) {
@@ -261,17 +274,6 @@ class BoneAnimation extends Animation {
 		#end
 	}
 
-	function multParent(i: Int, fasts: Array<Mat4>, bones: Array<TObj>, mats: Array<Mat4>) {
-		var f = fasts[i];
-		if (applyParent != null && !applyParent[i]) {
-			f.setFrom(mats[i]);
-			return;
-		}
-		var p = bones[i].parent;
-		var bi = getBoneIndex(p, bones);
-		(p == null || bi == -1) ? f.setFrom(mats[i]) : f.multmats(fasts[bi], mats[i]);
-	}
-
 	public function evaluateRootMotion(actionMats: Array<Mat4>): Vec4{
 		rootMotionIndex = getBoneIndex(rootMotion);
 		var scl = object.parent.transform.scale;
@@ -292,20 +294,22 @@ class BoneAnimation extends Animation {
 		
 	}
 
-
-	inline function multVecs(vec1: Vec4, vec2: Vec4): Vec4 {
-		var res = new Vec4().setFrom(vec1);
-		res.x *= vec2.x;
-		res.y *= vec2.y;
-		res.z *= vec2.z;
-		res.w *= vec2.w;
-
-		return res;
-
+	public function getRootMotionBone(): TObj {
+		return rootMotion;
 	}
 
-	public function getRootMotionBone(): TObj{
-		return rootMotion;
+	public function setRootMotion(bone: TObj, lockX: Bool = false, lockY: Bool = false, lockZ: Bool = false) {
+		rootMotion = bone;
+		rootMotionIndex = null;
+		oldPos = null;
+		rootMotionLockX	= lockX;
+		rootMotionLockY	= lockY;
+		rootMotionLockZ	= lockZ;
+		rootMotionVelocity = new Vec4();
+	}
+
+	public function getRootMoptionVelocity(): Vec4 {
+		return rootMotionVelocity;
 	}
 
 	function multParents(m: Mat4, i: Int, bones: Array<TObj>, mats: Array<Mat4>) {
@@ -398,9 +402,8 @@ class BoneAnimation extends Animation {
 		onUpdates.push(f);
 	}
 
-	// Do animation here
-	public function animationLoop(f: Array<Mat4>->Void){
-		updateAnimation = f;
+	public function removeUpdate(f: Void->Void) {
+		onUpdates.remove(f);
 	}
 
 	override public function updateActionTrack(sampler: ActionSampler) {
@@ -414,7 +417,7 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	public function sampleAction(sampler: ActionSampler, anctionMats: Array<Mat4>){
+	public function sampleAction(sampler: ActionSampler, anctionMats: Array<Mat4>) {
 		var bones = data.geom.actions.get(sampler.action);
 		for (i in 0...bones.length) {
 			if (i == rootMotionIndex){
@@ -526,121 +529,6 @@ class BoneAnimation extends Animation {
 		
 	}
 
-	public function blendAction(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = -1, threshold: FastFloat = 0.1){
-
-		if(factor < threshold) {
-			for(i in 0...actionMats1.length){
-				resultMat[i].setFrom(actionMats1[i]);
-			}
-		}
-		else if(factor > 1.0 - threshold){
-			for(i in 0...actionMats2.length){
-				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0){
-					resultMat[i].setFrom(actionMats2[i]);
-				}
-				else {
-					resultMat[i].setFrom(actionMats1[i]);
-				}
-			}
-		}
-		else {
-			for(i in 0...actionMats1.length){
-
-				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0) {
-					// Decompose
-					m.setFrom(actionMats1[i]);
-					m1.setFrom(actionMats2[i]);
-					m.decompose(vpos, q1, vscl);
-					m1.decompose(vpos2, q2, vscl2);
-					// Lerp
-					v1.lerp(vpos, vpos2, factor);
-					v2.lerp(vscl, vscl2, factor);
-					q3.lerp(q1, q2, factor);
-					// Compose
-					m2.fromQuat(q3);
-					m2.scale(v2);
-					m2._30 = v1.x;
-					m2._31 = v1.y;
-					m2._32 = v1.z;
-					if(i == rootMotionIndex){
-						m2._30 = rootMotionLockX ? vpos2.x : m2._30;
-						m2._31 = rootMotionLockY ? vpos2.y : m2._31;
-						m2._32 = rootMotionLockZ ? vpos2.z : m2._32;
-					}
-					// Return Result
-					resultMat[i].setFrom(m2);
-				}
-				else {
-					resultMat[i].setFrom(actionMats1[i]);
-				}
-			}
-		}
-	}
-
-	public function additiveBlendAction(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Int = -1, threshold: FastFloat = 0.1){
-
-		if(factor < threshold) {
-			for(i in 0...baseActionMats.length){
-				resultMat[i].setFrom(baseActionMats[i]);
-			}
-		}
-		else{
-			for(i in 0...baseActionMats.length){
-
-				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0) {
-					// Decompose
-					m.setFrom(baseActionMats[i]);
-					m1.setFrom(addActionMats[i]);
-					bm.setFrom(restPoseMats[i]);
-
-					m.decompose(vpos, q1, vscl);
-					m1.decompose(vpos2, q2, vscl2);
-					bm.decompose(vpos3, q3, vscl3);
-
-					// Add Transforms
-					v1.setFrom(vpos);
-					v2.setFrom(vpos2);
-					v2.sub(vpos3);
-					v2.mult(factor);
-					v1.add(v2);
-
-					// Add Scales
-					vscl2.mult(factor);
-					v2.set(1-factor, 1-factor, 1-factor, 1);
-					v2.add(vscl2);
-					v2.x *= vscl.x;
-					v2.y *= vscl.y;
-					v2.z *= vscl.z;
-					v2.w = 1.0;
-
-					// Add rotations
-					q2.lerp(q3, q2, factor);
-					wm.fromQuat(q3);
-					wm.getInverse(wm);
-					q3.fromMat(wm).normalize();
-					q3.multquats(q3, q2);
-					q3.multquats(q1, q3);
-
-					// Compose
-					m2.fromQuat(q3);
-					m2.scale(v2);
-					m2._30 = v1.x;
-					m2._31 = v1.y;
-					m2._32 = v1.z;
-					// Return Result
-					resultMat[i].setFrom(m2);
-				}
-				else{
-					resultMat[i].setFrom(baseActionMats[i]);
-				}
-			}
-		}
-	}
-
-	public function removeUpdate(f: Void->Void) {
-		onUpdates.remove(f);
-	}
-
 	function updateBonesOnly() {
 		if (boneChildren != null) {
 			for (i in 0...skeletonBones.length) {
@@ -718,7 +606,7 @@ class BoneAnimation extends Animation {
 		return actionMats != null ? actionMats[getBoneIndex(bone)] : null;
 	}
 
-	public function getWorldMat(bone: TObj, actionMats: Array<Mat4> = null): Mat4 {
+	function getWorldMat(bone: TObj, actionMats: Array<Mat4> = null): Mat4 {
 
 		if (actionMats == null) actionMats = skeletonMats;
 		if (applyParent == null) {
@@ -753,6 +641,158 @@ class BoneAnimation extends Animation {
 		var wm = getWorldMat(bone, actionMats);
 		wm.multmat(object.parent.transform.world);
 		return wm;
+	}
+
+	// Returns an array of bone matrices in world space
+	public function getWorldMatsFast(tip: TObj, chainLength: Int, actionMats: Array<Mat4> = null): Array<Mat4> {
+		if(actionMats == null) actionMats = skeletonMats;
+		var wmArray: Array<Mat4> = [];
+		var armatureMat = object.parent.transform.world;
+		var root = tip;
+		var numP = chainLength;
+		for (i in 0...chainLength) {
+			var wm = getAbsWorldMat(root, actionMats);
+			wmArray[chainLength - 1 - i] = wm.clone();
+			root = root.parent;
+			numP--;
+		}
+
+		// Root bone at [0]
+		return wmArray;
+	}
+
+	// Set bone transforms in world space
+	public function setBoneMatFromWorldMat(wm: Mat4, bone: TObj, actionMats: Array<Mat4> = null) {
+		if(actionMats == null) actionMats = skeletonMats;
+		var invMat = Mat4.identity();
+		var tempMat = wm.clone();
+		invMat.getInverse(object.parent.transform.world);
+		tempMat.multmat(invMat);
+		var bones: Array<TObj> = [];
+		var pBone = bone;
+		while (pBone.parent != null) {
+			bones.push(pBone.parent);
+			pBone = pBone.parent;
+		}
+
+		for (i in 0...bones.length) {
+			var x = bones.length - 1;
+			invMat.getInverse(getBoneMat(bones[x - i], actionMats));
+			tempMat.multmat(invMat);
+		}
+
+		getBoneMat(bone, actionMats).setFrom(tempMat);
+	}
+
+	public function blendAction(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = -1, threshold: FastFloat = 0.1) {
+
+		if(factor < threshold) {
+			for(i in 0...actionMats1.length){
+				resultMat[i].setFrom(actionMats1[i]);
+			}
+		}
+		else if(factor > 1.0 - threshold){
+			for(i in 0...actionMats2.length){
+				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0){
+					resultMat[i].setFrom(actionMats2[i]);
+				}
+				else {
+					resultMat[i].setFrom(actionMats1[i]);
+				}
+			}
+		}
+		else {
+			for(i in 0...actionMats1.length){
+
+				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0) {
+					// Decompose
+					m.setFrom(actionMats1[i]);
+					m1.setFrom(actionMats2[i]);
+					m.decompose(vpos, q1, vscl);
+					m1.decompose(vpos2, q2, vscl2);
+					// Lerp
+					v1.lerp(vpos, vpos2, factor);
+					v2.lerp(vscl, vscl2, factor);
+					q3.lerp(q1, q2, factor);
+					// Compose
+					m2.fromQuat(q3);
+					m2.scale(v2);
+					m2._30 = v1.x;
+					m2._31 = v1.y;
+					m2._32 = v1.z;
+					if(i == rootMotionIndex){
+						m2._30 = rootMotionLockX ? vpos2.x : m2._30;
+						m2._31 = rootMotionLockY ? vpos2.y : m2._31;
+						m2._32 = rootMotionLockZ ? vpos2.z : m2._32;
+					}
+					// Return Result
+					resultMat[i].setFrom(m2);
+				}
+				else {
+					resultMat[i].setFrom(actionMats1[i]);
+				}
+			}
+		}
+	}
+
+	public function additiveBlendAction(baseActionMats: Array<Mat4>, addActionMats: Array<Mat4>, restPoseMats: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat, layerMask: Int = -1, threshold: FastFloat = 0.1) {
+
+		if(factor < threshold) {
+			for(i in 0...baseActionMats.length){
+				resultMat[i].setFrom(baseActionMats[i]);
+			}
+		}
+		else{
+			for(i in 0...baseActionMats.length){
+
+				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0) {
+					// Decompose
+					m.setFrom(baseActionMats[i]);
+					m1.setFrom(addActionMats[i]);
+					bm.setFrom(restPoseMats[i]);
+
+					m.decompose(vpos, q1, vscl);
+					m1.decompose(vpos2, q2, vscl2);
+					bm.decompose(vpos3, q3, vscl3);
+
+					// Add Transforms
+					v1.setFrom(vpos);
+					v2.setFrom(vpos2);
+					v2.sub(vpos3);
+					v2.mult(factor);
+					v1.add(v2);
+
+					// Add Scales
+					vscl2.mult(factor);
+					v2.set(1-factor, 1-factor, 1-factor, 1);
+					v2.add(vscl2);
+					v2.x *= vscl.x;
+					v2.y *= vscl.y;
+					v2.z *= vscl.z;
+					v2.w = 1.0;
+
+					// Add rotations
+					q2.lerp(q3, q2, factor);
+					wm.fromQuat(q3);
+					wm.getInverse(wm);
+					q3.fromMat(wm).normalize();
+					q3.multquats(q3, q2);
+					q3.multquats(q1, q3);
+
+					// Compose
+					m2.fromQuat(q3);
+					m2.scale(v2);
+					m2._30 = v1.x;
+					m2._31 = v1.y;
+					m2._32 = v1.z;
+					// Return Result
+					resultMat[i].setFrom(m2);
+				}
+				else{
+					resultMat[i].setFrom(baseActionMats[i]);
+				}
+			}
+		}
 	}
 
 	public function solveIK(effector: TObj, goal: Vec4, precision = 0.01, maxIterations = 100, chainLenght = 100, pole: Vec4 = null, rollAngle = 0.0, actionMats: Array<Mat4> = null ) {
@@ -1121,45 +1161,5 @@ class BoneAnimation extends Animation {
 
 	}
 
-	// Returns an array of bone matrices in world space
-	public function getWorldMatsFast(tip: TObj, chainLength: Int, actionMats: Array<Mat4> = null): Array<Mat4> {
-		if(actionMats == null) actionMats = skeletonMats;
-		var wmArray: Array<Mat4> = [];
-		var armatureMat = object.parent.transform.world;
-		var root = tip;
-		var numP = chainLength;
-		for (i in 0...chainLength) {
-			var wm = getAbsWorldMat(root, actionMats);
-			wmArray[chainLength - 1 - i] = wm.clone();
-			root = root.parent;
-			numP--;
-		}
-
-		// Root bone at [0]
-		return wmArray;
-	}
-
-	// Set bone transforms in world space
-	public function setBoneMatFromWorldMat(wm: Mat4, bone: TObj, actionMats: Array<Mat4> = null) {
-		if(actionMats == null) actionMats = skeletonMats;
-		var invMat = Mat4.identity();
-		var tempMat = wm.clone();
-		invMat.getInverse(object.parent.transform.world);
-		tempMat.multmat(invMat);
-		var bones: Array<TObj> = [];
-		var pBone = bone;
-		while (pBone.parent != null) {
-			bones.push(pBone.parent);
-			pBone = pBone.parent;
-		}
-
-		for (i in 0...bones.length) {
-			var x = bones.length - 1;
-			invMat.getInverse(getBoneMat(bones[x - i], actionMats));
-			tempMat.multmat(invMat);
-		}
-
-		getBoneMat(bone, actionMats).setFrom(tempMat);
-	}
 }
 #end
