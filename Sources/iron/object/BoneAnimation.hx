@@ -432,6 +432,7 @@ class BoneAnimation extends Animation {
 
 	function updateAnimSampled(anim: TAnimation, m: Mat4, sampler: ActionSampler) {
 
+		if(anim == null) return;
 		var track = anim.tracks[0];
 		var sign = sampler.speed > 0 ? 1 : -1;
 
@@ -467,6 +468,7 @@ class BoneAnimation extends Animation {
 
 	function updateAnimSampledRootMotion(anim: TAnimation, m: Mat4, sampler: ActionSampler) {
 
+		if(anim == null) return;
 		var track = anim.tracks[0];
 		var sign = sampler.speed > 0 ? 1 : -1;
 
