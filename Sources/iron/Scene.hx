@@ -569,6 +569,15 @@ class Scene {
 			}
 		}
 		#end
+		else if (o.type == "collection_object") {
+			var object = addObject(parent);
+			returnObject(object, o, function(ro: Object) {
+				if (o.group_ref != null) { // Instantiate group objects
+					spawnGroup(format, o.group_ref, ro, function() { done(ro); });
+				}
+				else done(ro);
+			});
+		}
 		else if (o.type == "object") {
 			var object = addObject(parent);
 			returnObject(object, o, function(ro: Object) {
