@@ -408,7 +408,13 @@ class BoneAnimation extends Animation {
 
 	override public function updateActionTrack(sampler: ActionSampler) {
 		if(sampler.paused) return;
-		var bones = data.geom.actions.get(sampler.action);
+
+		if(! sampler.actionDataInit) {
+			var bones = data.geom.actions.get(sampler.action);
+			sampler.setBoneAction(bones);
+		}
+		
+		var bones = sampler.getBoneAction();
 		for(b in bones){
 			if (b.anim != null) {
 				updateTrack(b.anim, sampler);
@@ -418,7 +424,13 @@ class BoneAnimation extends Animation {
 	}
 
 	public function sampleAction(sampler: ActionSampler, anctionMats: Array<Mat4>) {
-		var bones = data.geom.actions.get(sampler.action);
+
+		if(! sampler.actionDataInit) {
+			var bones = data.geom.actions.get(sampler.action);
+			sampler.setBoneAction(bones);
+		}
+		
+		var bones = sampler.getBoneAction();
 		for (i in 0...bones.length) {
 			if (i == rootMotionIndex){
 				updateAnimSampledRootMotion(bones[i].anim, anctionMats[i], sampler);

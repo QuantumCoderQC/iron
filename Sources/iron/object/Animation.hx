@@ -245,6 +245,8 @@ class ActionSampler {
 	public var onComplete: Array<Void -> Void>;
 	public var timeOld: FastFloat = 0.0;
 	public var offsetOld: Int = 0;
+	var actionData: Array<TObj> = null;
+	public var actionDataInit(default, null): Bool = false;
 
 	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, startPaused: Bool = false, onComplete: Array<Void -> Void> = null) {
 
@@ -284,11 +286,30 @@ class ActionSampler {
 
 	public inline function setTimeOnly(time: FastFloat) {
 
-		this.time = time;		
+		this.time = time;
 	}
 
 	public inline function setFrameOffsetOnly(frame: Int) {
 
-		this.offset = frame;		
+		this.offset = frame;
+	}
+
+	public function getBoneAction(): Null<Array<TObj>> {
+		return actionData;
+	}
+
+	public function getObjectAction(): Null<TObj> {
+		if(actionData != null) return actionData[0];
+		return null;
+	}
+
+	public function setBoneAction(actionData: Array<TObj>) {
+		this.actionData = actionData;
+		actionDataInit = true;
+	}
+
+	public function setObjectAction(actionData: TObj) {
+		this.actionData = [actionData];
+		actionDataInit = true;
 	}
 }
