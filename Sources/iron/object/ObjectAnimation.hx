@@ -103,7 +103,13 @@ class ObjectAnimation extends Animation {
 
 	override public function updateActionTrack(sampler: ActionSampler) {
 		if(sampler.paused) return;
-		oaction = getAction(sampler.action);
+
+		if(! sampler.actionDataInit) {
+			var objanim = getAction(sampler.action);
+			sampler.setObjectAction(objanim);
+		}
+
+		oaction = sampler.getObjectAction();
 		updateTrack(oaction.anim, sampler);
 
 	}
@@ -133,8 +139,13 @@ class ObjectAnimation extends Animation {
 	}
 
 	public function sampleAction(sampler: ActionSampler, transformMap: Map<String, FastFloat>){
-		var objanim = getAction(sampler.action);
-			
+
+		if(! sampler.actionDataInit) {
+			var objanim = getAction(sampler.action);
+			sampler.setObjectAction(objanim);
+		}
+
+		var objanim = sampler.getObjectAction();
 		updateAnimSampled(objanim.anim, transformMap, sampler);
 	}
 
