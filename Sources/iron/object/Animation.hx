@@ -239,6 +239,7 @@ class ActionSampler {
 	public var action(default, null): String;
 	public var time(default, null): FastFloat = 0.0;
 	public var offset(default, null): Int = 0; // Frames to offset
+	public var totalFrames: Null<Int> = null;
 	public var speed: FastFloat; // Speed of the animation
 	public var loop: Bool;
 	public var paused: Bool = false;
@@ -294,22 +295,24 @@ class ActionSampler {
 		this.offset = frame;
 	}
 
-	public function getBoneAction(): Null<Array<TObj>> {
+	public inline function getBoneAction(): Null<Array<TObj>> {
 		return actionData;
 	}
 
-	public function getObjectAction(): Null<TObj> {
+	public inline function getObjectAction(): Null<TObj> {
 		if(actionData != null) return actionData[0];
 		return null;
 	}
 
-	public function setBoneAction(actionData: Array<TObj>) {
+	public inline function setBoneAction(actionData: Array<TObj>) {
 		this.actionData = actionData;
+		this.totalFrames = actionData[0].anim.tracks[0].frames.length;
 		actionDataInit = true;
 	}
 
-	public function setObjectAction(actionData: TObj) {
+	public inline function setObjectAction(actionData: TObj) {
 		this.actionData = [actionData];
+		this.totalFrames = actionData.anim.tracks[0].frames.length;
 		actionDataInit = true;
 	}
 }
