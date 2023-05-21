@@ -448,6 +448,7 @@ typedef TObj = {
 	@:optional public var parent_bone_tail: Float32Array; // Translate from head to tail
 	@:optional public var parent_bone_tail_pose: Float32Array;
 	@:optional public var parent_bone_connected: Null<Bool>;
+	@:optional public var bone_length: FastFloat;
 	@:optional public var visible: Null<Bool>;
 	@:optional public var visible_mesh: Null<Bool>;
 	@:optional public var visible_shadow: Null<Bool>;
