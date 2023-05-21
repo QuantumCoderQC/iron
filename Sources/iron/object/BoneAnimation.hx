@@ -195,6 +195,16 @@ class BoneAnimation extends Animation {
 		setMats();
 	}
 
+	function getAction(action: String): Array<TObj> {
+		if (isSkinned) {
+			return data.geom.actions.get(action);
+		}
+		else {
+			armature.initMats();
+			return armature.getAction(action).bones;
+		}
+	}
+
 	function multParent(i: Int, fasts: Array<Mat4>, bones: Array<TObj>, mats: Array<Mat4>) {
 		var f = fasts[i];
 		if (applyParent != null && !applyParent[i]) {
@@ -410,7 +420,7 @@ class BoneAnimation extends Animation {
 		if(sampler.paused) return;
 
 		if(! sampler.actionDataInit) {
-			var bones = data.geom.actions.get(sampler.action);
+			var bones = getAction(sampler.action);
 			sampler.setBoneAction(bones);
 		}
 		
@@ -426,7 +436,7 @@ class BoneAnimation extends Animation {
 	public function sampleAction(sampler: ActionSampler, anctionMats: Array<Mat4>) {
 
 		if(! sampler.actionDataInit) {
-			var bones = data.geom.actions.get(sampler.action);
+			var bones = getAction(sampler.action);
 			sampler.setBoneAction(bones);
 		}
 		
@@ -598,7 +608,7 @@ class BoneAnimation extends Animation {
 	}
 
 	public override function getTotalFrames(sampler: ActionSampler): Int {
-		var bones = data.geom.actions.get(sampler.action);
+		var bones = getAction(sampler.action);
 		var track = bones[0].anim.tracks[0];
 		return Std.int(track.frames[track.frames.length - 1] - track.frames[0]);
 	}
