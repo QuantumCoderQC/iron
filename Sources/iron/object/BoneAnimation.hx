@@ -635,19 +635,8 @@ class BoneAnimation extends Animation {
 	}
 
 	public function getBoneLen(bone: TObj): FastFloat {
-		var refs = data.geom.skeletonBoneRefs;
-		var lens = data.geom.skeletonBoneLens;
-		for (i in 0...refs.length) if (refs[i] == bone.name) return lens[i];
-		return 0.0;
-	}
 
-	// Returns bone length with scale applied
-	public function getBoneAbsLen(bone: TObj): FastFloat {
-		var refs = data.geom.skeletonBoneRefs;
-		var lens = data.geom.skeletonBoneLens;
-		var scale = object.parent.transform.world.getScale().z;
-		for (i in 0...refs.length) if (refs[i] == bone.name) return lens[i] * scale;
-		return 0.0;
+		return bone.bone_length;
 	}
 
 	// Returns bone matrix in world space
