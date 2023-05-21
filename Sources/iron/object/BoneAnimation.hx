@@ -184,27 +184,16 @@ class BoneAnimation extends Animation {
 	}
 
 	function setAction(action: String) {
-		if (isSkinned) {
-			skeletonBones = data.geom.actions.get(action);
-			skeletonMats = data.geom.mats.get(action);
-		}
-		else {
-			armature.initMats();
-			var a = armature.getAction(action);
-			skeletonBones = a.bones;
-			skeletonMats = a.mats;
-		}
+		armature.initMats();
+		var a = armature.getAction(action);
+		skeletonBones = a.bones;
+		skeletonMats = a.mats;
 		setMats();
 	}
 
 	function getAction(action: String): Array<TObj> {
-		if (isSkinned) {
-			return data.geom.actions.get(action);
-		}
-		else {
-			armature.initMats();
-			return armature.getAction(action).bones;
-		}
+		armature.initMats();
+		return armature.getAction(action).bones;
 	}
 
 	function multParent(i: Int, fasts: Array<Mat4>, bones: Array<TObj>, mats: Array<Mat4>) {
