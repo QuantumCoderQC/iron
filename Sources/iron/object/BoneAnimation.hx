@@ -20,6 +20,7 @@ class BoneAnimation extends Animation {
 
 	// Skinning
 	public var object: MeshObject;
+	public var armatureObject: Object;
 	public var data: MeshData;
 	public var skinBuffer: Float32Array;
 
@@ -72,9 +73,10 @@ class BoneAnimation extends Animation {
 	static var v1 = new Vec4();
 	static var v2 = new Vec4();
 
-	public function new(armatureUid: Int) {
+	public function new(armatureUid: Int, armatureObject: Object) {
 		super();
 		this.isSampled = false;
+		this.armatureObject = armatureObject;
 		for (a in Scene.active.armatures) {
 			if (a.uid == armatureUid) {
 				this.armature = a;
@@ -112,7 +114,7 @@ class BoneAnimation extends Animation {
 				Data.getSceneRaw(refs[0], function(action: TSceneFormat) { play(action.name); });
 			}
 		}
-		if (object.parent.raw.relative_bone_constraints) relativeBoneConstraints = true;
+		if (armatureObject.raw.relative_bone_constraints) relativeBoneConstraints = true;
 
 	}
 
@@ -286,7 +288,7 @@ class BoneAnimation extends Animation {
 
 	public function evaluateRootMotion(actionMats: Array<Mat4>): Vec4{
 		rootMotionIndex = getBoneIndex(rootMotion);
-		var scl = object.parent.transform.scale;
+		var scl = armatureObject.transform.scale;
 		var newPos = new Vec4().setFrom(getWorldMat(rootMotion, actionMats).getLoc());
 
 		if(oldPos == null) {
@@ -358,7 +360,7 @@ class BoneAnimation extends Animation {
 			constraintTargets = [];
 			constraintTargetsI = [];
 			// MeshObject -> ArmatureObject -> Collection/Empty
-			var conParent = object.parent.parent;
+			var conParent = armatureObject.parent;
 			if (conParent == null) return;
 			for (c in cs) {
 				var o = conParent.getChild(c.target);
@@ -397,10 +399,10 @@ class BoneAnimation extends Animation {
 					m = Mat4.identity();
 					constraintMats.set(bone, m);
 				}
-				m.setFrom(object.parent.transform.world); // Armature transform
+				m.setFrom(armatureObject.transform.world); // Armature transform
 				m.multmat(constraintTargetsI[i]); // Roll back initial hitbox transform
 				m.multmat(o.transform.world); // Current hitbox transform
-				m1.getInverse(object.parent.transform.world); // Roll back armature transform
+				m1.getInverse(armatureObject.transform.world); // Roll back armature transform
 				m.multmat(m1);
 			}
 		}
@@ -663,7 +665,7 @@ class BoneAnimation extends Animation {
 	public function getAbsWorldMat(bone: TObj, actionMats: Array<Mat4> = null): Mat4 {
 		if(actionMats == null) actionMats = skeletonMats;
 		var wm = getWorldMat(bone, actionMats);
-		wm.multmat(object.parent.transform.world);
+		wm.multmat(armatureObject.transform.world);
 		return wm;
 	}
 
@@ -671,7 +673,7 @@ class BoneAnimation extends Animation {
 	public function getWorldMatsFast(tip: TObj, chainLength: Int, actionMats: Array<Mat4> = null): Array<Mat4> {
 		if(actionMats == null) actionMats = skeletonMats;
 		var wmArray: Array<Mat4> = [];
-		var armatureMat = object.parent.transform.world;
+		var armatureMat = armatureObject.transform.world;
 		var root = tip;
 		var numP = chainLength;
 		for (i in 0...chainLength) {
@@ -690,7 +692,7 @@ class BoneAnimation extends Animation {
 		if(actionMats == null) actionMats = skeletonMats;
 		var invMat = Mat4.identity();
 		var tempMat = wm.clone();
-		invMat.getInverse(object.parent.transform.world);
+		invMat.getInverse(armatureObject.transform.world);
 		tempMat.multmat(invMat);
 		var bones: Array<TObj> = [];
 		var pBone = bone;

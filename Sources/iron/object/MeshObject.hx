@@ -93,7 +93,7 @@ class MeshObject extends Object {
 		if (hasAction) {
 			var armatureUid = parent.uid;
 			animation = getBoneAnimation(armatureUid);
-			if (animation == null) animation = new BoneAnimation(armatureUid);
+			if (animation == null) animation = new BoneAnimation(armatureUid, parent);
 			if (data.isSkinned) cast(animation, BoneAnimation).setSkin(this);
 		}
 		#end
