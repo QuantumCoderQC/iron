@@ -26,8 +26,8 @@ class BoneAnimation extends Animation {
 
 	var updateAnimation: Array<Mat4>->Void = null;
 
-	var skeletonBones: Array<TObj> = null;
-	var skeletonMats: Array<Mat4> = null;
+	public var skeletonBones(default, null): Array<TObj> = null;
+	public var skeletonMats(default, null): Array<Mat4> = null;
 	//var skeletonBonesBlend: Array<TObj> = null;
 	var absMats: Array<Mat4> = null;
 	var applyParent: Array<Bool> = null;
@@ -278,10 +278,10 @@ class BoneAnimation extends Animation {
 	public function evaluateRootMotion(actionMats: Array<Mat4>): Vec4{
 		rootMotionIndex = getBoneIndex(rootMotion);
 		var scl = armatureObject.transform.scale;
-		var newPos = new Vec4().setFrom(getWorldMat(rootMotion, actionMats).getLoc());
+		var newPos = new Vec4().setFrom(getWorldMat(actionMats, rootMotion).getLoc());
 
 		if(oldPos == null) {
-			oldPos = new Vec4().setFrom(getBoneMat(rootMotion, actionMats).getLoc());
+			oldPos = new Vec4().setFrom(getBoneMat(actionMats, rootMotion).getLoc());
 			return rootMotionVelocity;
 		}
 
@@ -616,14 +616,11 @@ class BoneAnimation extends Animation {
 		return -1;
 	}
 
-	public function getBoneMat(bone: TObj, actionMats: Array<Mat4> = null): Mat4 {
-		if(actionMats == null) actionMats = skeletonMats;
+	public function getBoneMat(actionMats: Array<Mat4>, bone: TObj): Mat4 {
 		return actionMats != null ? actionMats[getBoneIndex(bone)] : null;
 	}
 
-	function getWorldMat(bone: TObj, actionMats: Array<Mat4> = null): Mat4 {
-
-		if (actionMats == null) actionMats = skeletonMats;
+	function getWorldMat(actionMats: Array<Mat4>, bone: TObj): Mat4 {
 		if (applyParent == null) {
 			applyParent = [];
 			for (m in actionMats) applyParent.push(true);
@@ -640,22 +637,19 @@ class BoneAnimation extends Animation {
 	}
 
 	// Returns bone matrix in world space
-	public function getAbsWorldMat(bone: TObj, actionMats: Array<Mat4> = null): Mat4 {
-		if(actionMats == null) actionMats = skeletonMats;
-		var wm = getWorldMat(bone, actionMats);
+	public function getAbsWorldMat(actionMats: Array<Mat4>, bone: TObj): Mat4 {
+		var wm = getWorldMat(actionMats, bone);
 		wm.multmat(armatureObject.transform.world);
 		return wm;
 	}
 
 	// Returns an array of bone matrices in world space
-	public function getWorldMatsFast(tip: TObj, chainLength: Int, actionMats: Array<Mat4> = null): Array<Mat4> {
-		if(actionMats == null) actionMats = skeletonMats;
+	public function getWorldMatsFast(actionMats: Array<Mat4>, tip: TObj, chainLength: Int): Array<Mat4> {
 		var wmArray: Array<Mat4> = [];
-		var armatureMat = armatureObject.transform.world;
 		var root = tip;
 		var numP = chainLength;
 		for (i in 0...chainLength) {
-			var wm = getAbsWorldMat(root, actionMats);
+			var wm = getAbsWorldMat(actionMats, root);
 			wmArray[chainLength - 1 - i] = wm.clone();
 			root = root.parent;
 			numP--;
@@ -666,8 +660,7 @@ class BoneAnimation extends Animation {
 	}
 
 	// Set bone transforms in world space
-	public function setBoneMatFromWorldMat(wm: Mat4, bone: TObj, actionMats: Array<Mat4> = null) {
-		if(actionMats == null) actionMats = skeletonMats;
+	public function setBoneMatFromWorldMat(actionMats: Array<Mat4>, wm: Mat4, bone: TObj) {
 		var invMat = Mat4.identity();
 		var tempMat = wm.clone();
 		invMat.getInverse(armatureObject.transform.world);
@@ -681,11 +674,11 @@ class BoneAnimation extends Animation {
 
 		for (i in 0...bones.length) {
 			var x = bones.length - 1;
-			invMat.getInverse(getBoneMat(bones[x - i], actionMats));
+			invMat.getInverse(getBoneMat(actionMats, bones[x - i]));
 			tempMat.multmat(invMat);
 		}
 
-		getBoneMat(bone, actionMats).setFrom(tempMat);
+		getBoneMat(actionMats, bone).setFrom(tempMat);
 	}
 
 	public function blendAction(actionMats1: Array<Mat4>, actionMats2: Array<Mat4>, resultMat: Array<Mat4>, factor: FastFloat = 0.0, layerMask: Int = -1, threshold: FastFloat = 0.1) {
@@ -799,9 +792,7 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	public function solveIK(effector: TObj, goal: Vec4, precision = 0.01, maxIterations = 100, chainLenght = 100, pole: Vec4 = null, rollAngle = 0.0, actionMats: Array<Mat4> = null ) {
-		if(actionMats == null) actionMats = skeletonMats;
-		
+	public function solveIK(actionMats: Array<Mat4>, effector: TObj, goal: Vec4, precision = 0.01, maxIterations = 100, chainLenght = 100, pole: Vec4 = null, rollAngle = 0.0) {
 		// Array of bones to solve IK for, effector at 0
 		var bones: Array<TObj> = [];
 
@@ -829,7 +820,7 @@ class BoneAnimation extends Animation {
 		}
 
 		// Get all bone mats in world space
-		boneWorldMats = getWorldMatsFast(effector, bones.length, actionMats);
+		boneWorldMats = getWorldMatsFast(actionMats, effector, bones.length);
 
 		var tempIndex = 0;
 		for(b in bones){
@@ -841,7 +832,7 @@ class BoneAnimation extends Animation {
 		root = bones[bones.length - 1];
 
 		// World matrix of root bone
-		var rootWorldMat = getAbsWorldMat(root, actionMats).clone();
+		var rootWorldMat = getAbsWorldMat(actionMats, root).clone();
 		// Distance from root to goal
 		var dist = Vec4.distance(goal, rootWorldMat.getLoc());
 
@@ -865,12 +856,12 @@ class BoneAnimation extends Animation {
 			rootWorldMat.compose(tempLoc, tempRot2, tempScl);
 
 			// Set bone matrix in local space from world space
-			setBoneMatFromWorldMat(rootWorldMat, root, actionMats);
+			setBoneMatFromWorldMat(actionMats, rootWorldMat, root);
 
 			// Set child bone rotations to zero
 			for (i in 0...bones.length - 1) {
-				getBoneMat(bones[i], actionMats).decompose(tempLoc, tempRot, tempScl);
-				getBoneMat(bones[i], actionMats).compose(tempLoc, roll, tempScl);
+				getBoneMat(actionMats, bones[i]).decompose(tempLoc, tempRot, tempScl);
+				getBoneMat(actionMats, bones[i]).compose(tempLoc, roll, tempScl);
 			}
 			return;
 		}
@@ -947,7 +938,7 @@ class BoneAnimation extends Animation {
 			boneWorldMats[i].compose(boneWorldLocs[i], tempRot2, tempScl);
 
 			// Set bone matrix in local space from world space
-			setBoneMatFromWorldMat(boneWorldMats[i], bones[bones.length - 1 - i], actionMats);
+			setBoneMatFromWorldMat(actionMats, boneWorldMats[i], bones[bones.length - 1 - i]);
 		}
 
 		// Decompose matrix
@@ -967,7 +958,7 @@ class BoneAnimation extends Animation {
 		boneWorldMats[l - 1].compose(boneWorldLocs[l - 1], tempRot2, tempScl);
 
 		// Set bone matrix in local space from world space
-		setBoneMatFromWorldMat(boneWorldMats[l - 1], bones[0], actionMats);
+		setBoneMatFromWorldMat(actionMats, boneWorldMats[l - 1], bones[0]);
 	}
 
 	public function moveTowardPole(bone0Pos: Vec4, bone1Pos: Vec4, bone2Pos: Vec4, polePos: Vec4): Vec4 {
@@ -1034,15 +1025,13 @@ class BoneAnimation extends Animation {
 		return bone1Res;
 	}
 
-	public function solveTwoBoneIK(effector: TObj, goal: Vec4, pole: Vec4 = null, rollAngle = 0.0, actionMats : Array<Mat4> = null) {
-		if(actionMats == null) actionMats = skeletonMats;
-		
+	public function solveTwoBoneIK(actionMats : Array<Mat4>, effector: TObj, goal: Vec4, pole: Vec4 = null, rollAngle = 0.0) {		
 		var roll = new Quat().fromEuler(0, rollAngle, 0);
 		var root = effector.parent;
 
 		// Get bone transforms in world space
-		var effectorMat = getAbsWorldMat(effector, actionMats).clone();
-		var rootMat = getAbsWorldMat(root, actionMats).clone();
+		var effectorMat = getAbsWorldMat(actionMats, effector).clone();
+		var rootMat = getAbsWorldMat(actionMats, root).clone();
 
 		// Get bone lenghts
 		var effectorLen = getBoneLen(effector) * effectorMat.getScale().x;
@@ -1108,7 +1097,7 @@ class BoneAnimation extends Animation {
 		effectorMat.setLoc(new Vec4());
 		effectorMat.applyQuat(new Quat().fromAxisAngle(axis0, angleB2 - angleA2));
 		effectorMat.setLoc(vpos);
-		setBoneMatFromWorldMat(effectorMat, effector, actionMats);
+		setBoneMatFromWorldMat(actionMats, effectorMat, effector);
 
 		// Apply rotations to root bone
 		vpos.setFrom(rootMat.getLoc());
@@ -1116,10 +1105,10 @@ class BoneAnimation extends Animation {
 		rootMat.applyQuat(new Quat().fromAxisAngle(axis0, angleB1 - angleA1));
 		rootMat.applyQuat(new Quat().fromAxisAngle(axis1, angleA3));
 		rootMat.setLoc(vpos);
-		setBoneMatFromWorldMat(rootMat, root, actionMats);
+		setBoneMatFromWorldMat(actionMats, rootMat, root);
 
 		// Recalculate new effector matrix
-		effectorMat.setFrom(getAbsWorldMat(effector, actionMats));
+		effectorMat.setFrom(getAbsWorldMat(actionMats, effector));
 
 		// Check if pole present
 		if((pole != null) && (goalLen < totalLength)) {
@@ -1160,8 +1149,8 @@ class BoneAnimation extends Animation {
 		effectorMat.setLoc(vpos);
 
 		// Finally set root and effector matrices in local space
-		setBoneMatFromWorldMat(rootMat, root, actionMats);
-		setBoneMatFromWorldMat(effectorMat, effector, actionMats);
+		setBoneMatFromWorldMat(actionMats, rootMat, root);
+		setBoneMatFromWorldMat(actionMats, effectorMat, effector);
 
 	}
 
