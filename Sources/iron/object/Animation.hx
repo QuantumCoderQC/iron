@@ -138,6 +138,8 @@ class Animation {
 		var time = sampler.time;
 		var frameIndex = sampler.offset;
 		var speed = sampler.speed;
+		sampler.cacheSet = false;
+		sampler.trackEnd = false;
 
 		var track = anim.tracks[0];
 
@@ -178,6 +180,7 @@ class Animation {
 				sampler.paused = true;
 			}
 			if (sampler.onComplete != null) for(func in sampler.onComplete){ func();};
+			sampler.trackEnd = true;
 		}
 
 		sampler.setFrameOffsetOnly(frameIndex);
@@ -244,13 +247,18 @@ class ActionSampler {
 	public var loop: Bool;
 	public var paused: Bool = false;
 	public var onComplete: Array<Void -> Void>;
+	public var trackEnd: Bool = false;
 	public var timeOld: FastFloat = 0.0;
 	public var offsetOld: Int = 0;
 	var actionData: Array<TObj> = null;
 	public var actionDataInit(default, null): Bool = false;
+	public var rootMotionPos: Bool = false;
+	public var rootMotionRot: Bool = false;
+	var actionCache: Mat4 = Mat4.identity();
+	public var cacheSet: Bool = false;
+	public var cacheInit(default, null): Bool = false;
 
 	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, startPaused: Bool = false, onComplete: Array<Void -> Void> = null) {
-
 		this.action = action;
 		this.speed = speed;
 		this.loop = loop;
@@ -261,24 +269,25 @@ class ActionSampler {
 	public inline function setFrameOffset(frameOffset: Int){
 		this.offset = frameOffset;
 		this.time = Scene.active.raw.frame_time * offset;
+		cacheInit = false;
 	}
 
 	public inline function setTimeOffset(timeOffset: FastFloat){
 		this.time = timeOffset;
 		var ftime: FastFloat = Scene.active.raw.frame_time;
 		this.offset = Std.int(time / ftime);
+		cacheInit = false;
 	}
 
 	public inline function restartAction() {
-
 		this.setFrameOffset(0);
-		paused = false;	
+		paused = false;
+		cacheInit = false;
 	}
 
 	public function notifyOnComplete(onComplete: Void -> Void) {
 		if(this.onComplete == null) this.onComplete = [];
 		this.onComplete.push(onComplete);
-		
 	}
 
 	public function removeOnComplete(onComplete: Void -> Void) {
@@ -286,12 +295,10 @@ class ActionSampler {
 	}
 
 	public inline function setTimeOnly(time: FastFloat) {
-
 		this.time = time;
 	}
 
 	public inline function setFrameOffsetOnly(frame: Int) {
-
 		this.offset = frame;
 	}
 
@@ -307,6 +314,8 @@ class ActionSampler {
 	public inline function setBoneAction(actionData: Array<TObj>) {
 		this.actionData = actionData;
 		this.totalFrames = actionData[0].anim.tracks[0].frames.length;
+		if(actionData[0].anim.root_motion_pos) this.rootMotionPos = true;
+		if(actionData[0].anim.root_motion_rot) this.rootMotionRot = true;
 		actionDataInit = true;
 	}
 
@@ -314,5 +323,15 @@ class ActionSampler {
 		this.actionData = [actionData];
 		this.totalFrames = actionData.anim.tracks[0].frames.length;
 		actionDataInit = true;
+	}
+
+	public inline function setActionCache(m: Mat4) {
+		if(! cacheSet) actionCache.setFrom(m);
+		cacheSet = true;
+		cacheInit = true;
+	}
+
+	public inline function getActionCache(m: Mat4) {
+		m.setFrom(actionCache);
 	}
 }
