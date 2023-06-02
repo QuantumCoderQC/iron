@@ -541,6 +541,8 @@ typedef TAnimation = {
 	@:optional public var has_delta: Null<Bool>; // Delta transform
 	@:optional public var marker_frames: Uint32Array;
 	@:optional public var marker_names: Array<String>;
+	@:optional public var root_motion_pos: Null<Bool>;
+	@:optional public var root_motion_rot: Null<Bool>;
 }
 
 #if js
