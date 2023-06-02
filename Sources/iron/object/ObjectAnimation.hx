@@ -80,6 +80,8 @@ class ObjectAnimation extends Animation {
 	function updateTransformAnim(anim: TAnimation, transform: Transform) {
 		if (anim == null) return;
 
+		var tempRot = new Vec4();
+
 		var total = anim.end * frameTime - anim.begin * frameTime;
 
 		if (anim.has_delta) {
@@ -129,9 +131,9 @@ class ObjectAnimation extends Animation {
 				case "xloc": transform.loc.x = value;
 				case "yloc": transform.loc.y = value;
 				case "zloc": transform.loc.z = value;
-				case "xrot": transform.setRotation(value, transform._eulerY, transform._eulerZ);
-				case "yrot": transform.setRotation(transform._eulerX, value, transform._eulerZ);
-				case "zrot": transform.setRotation(transform._eulerX, transform._eulerY, value);
+				case "xrot": tempRot.x = value;
+				case "yrot": tempRot.y = value;
+				case "zrot": tempRot.z = value;
 				case "qwrot": transform.rot.w = value;
 				case "qxrot": transform.rot.x = value;
 				case "qyrot": transform.rot.y = value;
@@ -155,6 +157,8 @@ class ObjectAnimation extends Animation {
 				case "dzscl": transform.dscale.z = value;
 			}
 		}
+
+		transform.rot.fromEulerOrdered(tempRot, "XYZ");
 	}
 
 	override public function totalFrames(): Int {
