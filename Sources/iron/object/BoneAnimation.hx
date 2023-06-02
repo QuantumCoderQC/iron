@@ -36,15 +36,14 @@ class BoneAnimation extends Animation {
 	var matsFastBlend: Array<Mat4> = [];
 	var matsFastBlendSort: Array<Int> = [];
 
-	var rootMotion: TObj = null;
-	var rootMotionVelocity: Vec4 = null;
-	var rootMotionIndex: Null<Int> = null;
+	var rootMotionCacheInit: Bool = false;
+	public var rootMotion(default, null): TObj = null;
+	public var rootMotionVelocity(default, null): Vec4 = null;
+	public var rootMotionRotation(default, null): Quat = null;
+	var rootMotionIndex: Int = -1;
 	var rootMotionLockX: Bool = false;
 	var rootMotionLockY: Bool = false;
 	var rootMotionLockZ: Bool = false;
-	var oldPos: Vec4 = null;
-	var oldPosWorld: Vec4 = null;
-	var oldTransform: Mat4 = null;
 
 	var delta: FastFloat = 0;
 
@@ -61,15 +60,15 @@ class BoneAnimation extends Animation {
 	static var bm = Mat4.identity(); // Absolute bone matrix
 	static var wm = Mat4.identity();
 	static var vpos = new Vec4();
+	static var vpos2 = new Vec4();
+	static var vpos3 = new Vec4();
 	static var vscl = new Vec4();
+	static var vscl2 = new Vec4();
+	static var vscl3 = new Vec4();
 	static var q1 = new Quat();
 	static var q2 = new Quat();
 	static var q3 = new Quat();
 	static var q4 = new Quat();
-	static var vpos2 = new Vec4();
-	static var vpos3 = new Vec4();
-	static var vscl2 = new Vec4();
-	static var vscl3 = new Vec4();
 	static var v1 = new Vec4();
 	static var v2 = new Vec4();
 
@@ -188,6 +187,8 @@ class BoneAnimation extends Animation {
 		var a = armature.getAction(action);
 		skeletonBones = a.bones;
 		skeletonMats = a.mats;
+		if(! rootMotionCacheInit) skeletonMats.push(Mat4.identity());
+		rootMotionCacheInit = true;
 		setMats();
 	}
 
@@ -276,41 +277,25 @@ class BoneAnimation extends Animation {
 	}
 
 	public function evaluateRootMotion(actionMats: Array<Mat4>): Vec4{
-		rootMotionIndex = getBoneIndex(rootMotion);
+		if(rootMotionIndex < 0) return new Vec4();
 		var scl = armatureObject.transform.scale;
-		var newPos = new Vec4().setFrom(getWorldMat(actionMats, rootMotion).getLoc());
-
-		if(oldPos == null) {
-			oldPos = new Vec4().setFrom(getBoneMat(actionMats, rootMotion).getLoc());
-			return rootMotionVelocity;
-		}
-
-		actionMats[rootMotionIndex]._30 = oldPos.x;
-		actionMats[rootMotionIndex]._31 = oldPos.y;
-		actionMats[rootMotionIndex]._32 = oldPos.z;
-
-		newPos = multVecs(newPos, scl);
-		rootMotionVelocity.setFrom(newPos);
+		wm = getRootMotionWorldMat(actionMats, rootMotion);
+		wm.decompose(vpos, q1, vscl);
+		vpos = multVecs(vpos, scl);
+		rootMotionVelocity.setFrom(vpos);
+		rootMotionRotation.setFrom(q1);
 		return new Vec4().setFrom(rootMotionVelocity);
 		
 	}
 
-	public function getRootMotionBone(): TObj {
-		return rootMotion;
-	}
-
 	public function setRootMotion(bone: TObj, lockX: Bool = false, lockY: Bool = false, lockZ: Bool = false) {
 		rootMotion = bone;
-		rootMotionIndex = null;
-		oldPos = null;
+		rootMotionIndex = getBoneIndex(rootMotion);
 		rootMotionLockX	= lockX;
 		rootMotionLockY	= lockY;
 		rootMotionLockZ	= lockZ;
 		rootMotionVelocity = new Vec4();
-	}
-
-	public function getRootMoptionVelocity(): Vec4 {
-		return rootMotionVelocity;
+		rootMotionRotation = new Quat();
 	}
 
 	function multParents(m: Mat4, i: Int, bones: Array<TObj>, mats: Array<Mat4>) {
@@ -424,7 +409,7 @@ class BoneAnimation extends Animation {
 		}
 	}
 
-	public function sampleAction(sampler: ActionSampler, anctionMats: Array<Mat4>) {
+	public function sampleAction(sampler: ActionSampler, actionMats: Array<Mat4>) {
 
 		if(! sampler.actionDataInit) {
 			var bones = getAction(sampler.action);
@@ -432,18 +417,21 @@ class BoneAnimation extends Animation {
 		}
 		
 		var bones = sampler.getBoneAction();
+		actionMats[skeletonBones.length].setIdentity();
 		for (i in 0...bones.length) {
-			if (i == rootMotionIndex){
-				updateAnimSampledRootMotion(bones[i].anim, anctionMats[i], sampler);
+			var anim = bones[i].anim;
+			var rootMotionEnabled = anim.root_motion_pos || anim.root_motion_rot;
+			if (i == rootMotionIndex && rootMotionEnabled){
+				updateAnimSampledRootMotion(bones[i].anim, actionMats[i], actionMats[skeletonBones.length], sampler);
 			}
 			else {
-				updateAnimSampled(bones[i].anim, anctionMats[i], sampler);
+				updateAnimSampled(bones[i].anim, actionMats[i], sampler);
 			}
 		}
 
 	}
 
-	function updateAnimSampled(anim: TAnimation, m: Mat4, sampler: ActionSampler) {
+	function updateAnimSampled(anim: TAnimation, mm: Mat4, sampler: ActionSampler) {
 
 		if(anim == null) return;
 		var track = anim.tracks[0];
@@ -455,51 +443,72 @@ class BoneAnimation extends Animation {
 		var ti = sampler.offset;
 		//ti = ti < 0 ? 1 : ti;
 
-		var t1 = track.frames[ti] * frameTime;
-		var t2 = track.frames[ti + sign] * frameTime;
-		var s: FastFloat = (t - t1) / (t2 - t1); // Linear
-
-		m1.setF32(track.values, ti * 16); // Offset to 4x4 matrix array
-		m2.setF32(track.values, (ti + sign) * 16);
-
-		// Decompose
-		m1.decompose(vpos, q1, vscl);
-		m2.decompose(vpos2, q2, vscl2);
-
-		// Lerp
-		v1.lerp(vpos, vpos2, s);
-		v2.lerp(vscl, vscl2, s);
-		q3.lerp(q1, q2, s);
-
-		// Compose
-		m.fromQuat(q3);
-		m.scale(v2);
-		m._30 = v1.x;
-		m._31 = v1.y;
-		m._32 = v1.z;
+		interpoateSample(track, mm, t, ti, sign);
 	}
 
-	function updateAnimSampledRootMotion(anim: TAnimation, m: Mat4, sampler: ActionSampler) {
-
+	function updateAnimSampledRootMotion(anim: TAnimation, mm: Mat4, rm: Mat4, sampler: ActionSampler) {
 		if(anim == null) return;
 		var track = anim.tracks[0];
 		var sign = sampler.speed > 0 ? 1 : -1;
 
+		var t0 = speed > 0 ? 0 : track.frames.length - 1;
 		var t = sampler.time;
-		var tOld = sampler.timeOld;
-		//t = t < 0 ? 0.1 : t;
-
 		var ti = sampler.offset;
-		var tiOld = sampler.offsetOld;
-		//ti = ti < 0 ? 1 : ti;
 
-		
-		if(tiOld > track.frames.length - 2){
-			ti = track.frames.length - 2;
-			t = track.frames[ti + sign] * frameTime;
-			tiOld = ti;
+		if(sampler.trackEnd || !sampler.cacheInit) {
+			interpoateSample(track, bm, t, ti, sign);
+			//bm.setF32(track.values, t0);
+			sampler.setActionCache(bm);
 		}
 
+		// Interpolated action for current frame
+		interpoateSample(track, m1, t, ti, sign);
+		// Action at first frame
+		m.setF32(track.values, t0);
+		// Action at previous frame
+		sampler.getActionCache(m2);
+
+		m.decompose(vpos, q1, vscl);
+		m1.decompose(vpos2, q2, vscl2);
+		m2.decompose(vpos3, q3, vscl3);
+
+		// Compose
+		if(sampler.rootMotionRot) {
+			// Bone matrix
+			mm.fromQuat(q1);
+			mm.scale(vscl2);
+			// Root motion matrix
+			q2.mult(q4.inverse(q3));
+			rm.fromQuat(q2);
+		}
+		else {
+			// Bone matrix
+			mm.fromQuat(q2);
+			mm.scale(vscl2);
+		}
+
+		if(sampler.rootMotionPos) {
+			// Bone matrix
+			mm._30 = vpos.x;
+			mm._31 = vpos.y;
+			mm._32 = vpos.z;
+			// Root motion matrix
+			rm._30 = vpos2.x - vpos3.x;
+			rm._31 = vpos2.y - vpos3.y;
+			rm._32 = vpos2.z - vpos3.z;
+		}
+		else {
+			// Bone matrix
+			mm._30 = vpos2.x;
+			mm._31 = vpos2.y;
+			mm._32 = vpos2.z;
+		}
+
+		sampler.setActionCache(m1);
+	}
+
+
+	inline function interpoateSample(track: TTrack, m: Mat4, t: FastFloat, ti: Int, sign: Int) {
 		var t1 = track.frames[ti] * frameTime;
 		var t2 = track.frames[ti + sign] * frameTime;
 		var s: FastFloat = (t - t1) / (t2 - t1); // Linear
@@ -522,26 +531,6 @@ class BoneAnimation extends Animation {
 		m._30 = v1.x;
 		m._31 = v1.y;
 		m._32 = v1.z;
-
-		// Calculate delata for root motion
-		t1 = track.frames[tiOld] * frameTime;
-		t2 = track.frames[tiOld + sign] * frameTime;
-		s = (tOld - t1) / (t2 - t1); // Linear
-
-		m1.setF32(track.values, tiOld * 16); // Offset to 4x4 matrix array
-		m2.setF32(track.values, (tiOld + sign) * 16);
-
-		// Decompose
-		m1.decompose(vpos, q1, vscl);
-		m2.decompose(vpos2, q2, vscl2);
-
-		// Lerp
-		v1.lerp(vpos, vpos2, s);
-
-		m._30 -= v1.x;
-		m._31 -= v1.y;
-		m._32 -= v1.z;
-		
 	}
 
 	function updateBonesOnly() {
@@ -631,9 +620,18 @@ class BoneAnimation extends Animation {
 		return wm;
 	}
 
-	public function getBoneLen(bone: TObj): FastFloat {
-
-		return bone.bone_length;
+	function getRootMotionWorldMat(actionMats: Array<Mat4>, bone: TObj): Mat4 {
+		// Get root motion bone index
+		var i = getBoneIndex(bone);
+		// Store current bone matrix in temp
+		var tempMat = Mat4.identity().setFrom(actionMats[i]);
+		// Move root motion cache to bone position
+		actionMats[i].setFrom(actionMats[skeletonBones.length]);
+		// Calculate world matrix
+		wm.setFrom(getWorldMat(actionMats, bone));
+		// Revert to old value
+		actionMats[i].setFrom(tempMat);
+		return wm;
 	}
 
 	// Returns bone matrix in world space
@@ -685,14 +683,21 @@ class BoneAnimation extends Animation {
 
 		if(factor < threshold) {
 			for(i in 0...actionMats1.length){
+				// Use Action 1
 				resultMat[i].setFrom(actionMats1[i]);
 			}
 		}
 		else if(factor > 1.0 - threshold){
 			for(i in 0...actionMats2.length){
-				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0){
+				// If root motion cache -> use root motion index, else use current index
+				var j = i == skeletonBones.length ? rootMotionIndex : i;
+				// Skip if root motion is disabled
+				if(j < 0) continue;
+				// Use Action 2
+				if(skeletonBones[j].bone_layers[layerMask] || layerMask < 0){
 					resultMat[i].setFrom(actionMats2[i]);
 				}
+				// Use Action 1 if not in layer
 				else {
 					resultMat[i].setFrom(actionMats1[i]);
 				}
@@ -700,8 +705,12 @@ class BoneAnimation extends Animation {
 		}
 		else {
 			for(i in 0...actionMats1.length){
-
-				if(skeletonBones[i].bone_layers[layerMask] || layerMask < 0) {
+				// If root motion cache -> use root motion index, else use current index
+				var j = i == skeletonBones.length ? rootMotionIndex : i;
+				// Skip if root motion is disabled
+				if(j < 0) continue;
+				// Blend
+				if(skeletonBones[j].bone_layers[j] || layerMask < 0) {
 					// Decompose
 					m.setFrom(actionMats1[i]);
 					m1.setFrom(actionMats2[i]);
@@ -717,7 +726,8 @@ class BoneAnimation extends Animation {
 					m2._30 = v1.x;
 					m2._31 = v1.y;
 					m2._32 = v1.z;
-					if(i == rootMotionIndex){
+					// Lock root motion to one action on certain axis to conserve looping
+					if(i == skeletonBones.length){
 						m2._30 = rootMotionLockX ? vpos2.x : m2._30;
 						m2._31 = rootMotionLockY ? vpos2.y : m2._31;
 						m2._32 = rootMotionLockZ ? vpos2.z : m2._32;
@@ -725,6 +735,7 @@ class BoneAnimation extends Animation {
 					// Return Result
 					resultMat[i].setFrom(m2);
 				}
+				// Use Action 1 if not in layer
 				else {
 					resultMat[i].setFrom(actionMats1[i]);
 				}
@@ -824,7 +835,7 @@ class BoneAnimation extends Animation {
 
 		var tempIndex = 0;
 		for(b in bones){
-			lengths.push(getBoneLen(b) * boneWorldMats[boneWorldMats.length - 1 - tempIndex].getScale().x);
+			lengths.push(b.bone_length * boneWorldMats[boneWorldMats.length - 1 - tempIndex].getScale().x);
 			tempIndex++;
 		}
 
@@ -1034,8 +1045,8 @@ class BoneAnimation extends Animation {
 		var rootMat = getAbsWorldMat(actionMats, root).clone();
 
 		// Get bone lenghts
-		var effectorLen = getBoneLen(effector) * effectorMat.getScale().x;
-		var rootLen = getBoneLen(root) * rootMat.getScale().x;
+		var effectorLen = effector.bone_length * effectorMat.getScale().x;
+		var rootLen = root.bone_length * rootMat.getScale().x;
 
 		// Get distance form root to goal
 		var goalLen = Math.abs(Vec4.distance(rootMat.getLoc(), goal));
