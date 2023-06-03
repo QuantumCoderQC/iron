@@ -418,9 +418,8 @@ class BoneAnimation extends Animation {
 		
 		var bones = sampler.getBoneAction();
 		actionMats[skeletonBones.length].setIdentity();
+		var rootMotionEnabled = sampler.rootMotionPos || sampler.rootMotionRot;
 		for (i in 0...bones.length) {
-			var anim = bones[i].anim;
-			var rootMotionEnabled = anim.root_motion_pos || anim.root_motion_rot;
 			if (i == rootMotionIndex && rootMotionEnabled){
 				updateAnimSampledRootMotion(bones[i].anim, actionMats[i], actionMats[skeletonBones.length], sampler);
 			}
