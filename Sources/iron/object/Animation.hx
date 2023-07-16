@@ -19,7 +19,7 @@ class Animation {
 	public var armature: iron.data.Armature; // Bone
 	#end
 
-	// Lerp
+	// Helper variables.
 	static var m1 = Mat4.identity();
 	static var m2 = Mat4.identity();
 	static var vpos = new Vec4();
@@ -237,27 +237,86 @@ class Animation {
 	#end
 }
 
+/**
+ * Action Sampler State.
+ */
 class ActionSampler {
 
+	/**
+	 * Name of the action.
+	 */
 	public var action(default, null): String;
+	/**
+	 * Current time of the sampler.
+	 */
 	public var time(default, null): FastFloat = 0.0;
-	public var offset(default, null): Int = 0; // Frames to offset
+	/**
+	 * Current frame of the sampler.
+	 */
+	public var offset(default, null): Int = 0;
+	/**
+	 * Total frames in the action.
+	 */
 	public var totalFrames: Null<Int> = null;
-	public var speed: FastFloat; // Speed of the animation
+	/**
+	 * Speed of action sampling.
+	 */
+	public var speed: FastFloat;
+	/**
+	 * Loop action.
+	 */
 	public var loop: Bool;
+	/**
+	 * Sampler paused.
+	 */
 	public var paused: Bool = false;
+	/**
+	 * Callback functions to call after action ends.
+	 */
 	public var onComplete: Array<Void -> Void>;
+	/**
+	 * Action track ended.
+	 */
 	public var trackEnd: Bool = false;
 	public var timeOld: FastFloat = 0.0;
 	public var offsetOld: Int = 0;
+	/**
+	 * Cache action data objects. May be Bones or Objects.
+	 */
 	var actionData: Array<TObj> = null;
+	/**
+	 * Action data has been cached.
+	 */
 	public var actionDataInit(default, null): Bool = false;
+	/**
+	 * Positional Root Motion for this action.
+	 */
 	public var rootMotionPos: Bool = false;
+	/**
+	 * Rotational Root Motion for this action.
+	 */
 	public var rootMotionRot: Bool = false;
+	/**
+	 * Action matrix from previous sample. Mainly used for root motion.
+	 */
 	var actionCache: Mat4 = Mat4.identity();
+	/**
+	 * `actionCache` set this frame.
+	 */
 	public var cacheSet: Bool = false;
+	/**
+	 * `actionCache` initialized. Set to false to force reset cache.
+	 */
 	public var cacheInit(default, null): Bool = false;
 
+	/**
+	 * Create a new action sampler.
+	 * @param action Name of the action.
+	 * @param speed Speed of sampler.
+	 * @param loop Loop after action ends.
+	 * @param startPaused Do not start sample on init.
+	 * @param onComplete Callback functions after action completes.
+	 */
 	public inline function new(action: String, speed: FastFloat = 1.0, loop: Bool = true, startPaused: Bool = false, onComplete: Array<Void -> Void> = null) {
 		this.action = action;
 		this.speed = speed;
@@ -266,12 +325,20 @@ class ActionSampler {
 		this.paused = startPaused;
 	}
 
+	/**
+	 * Set current frame of the sampler. Time is calculated.
+	 * @param frameOffset Frame.
+	 */
 	public inline function setFrameOffset(frameOffset: Int){
 		this.offset = frameOffset;
 		this.time = Scene.active.raw.frame_time * offset;
 		cacheInit = false;
 	}
 
+	/**
+	 * Set current time of the sampler. Frame is calculated.
+	 * @param timeOffset Time.
+	 */
 	public inline function setTimeOffset(timeOffset: FastFloat){
 		this.time = timeOffset;
 		var ftime: FastFloat = Scene.active.raw.frame_time;
@@ -279,38 +346,69 @@ class ActionSampler {
 		cacheInit = false;
 	}
 
+	/**
+	 * Restart action.
+	 */
 	public inline function restartAction() {
 		this.setFrameOffset(0);
 		paused = false;
 		cacheInit = false;
 	}
 
+	/**
+	 * Add a callback function when action completes.
+	 * @param onComplete Callback
+	 */
 	public function notifyOnComplete(onComplete: Void -> Void) {
 		if(this.onComplete == null) this.onComplete = [];
 		this.onComplete.push(onComplete);
 	}
 
+	/**
+	 * Remove callback function
+	 * @param onComplete Callback
+	 */
 	public function removeOnComplete(onComplete: Void -> Void) {
 		this.onComplete.remove(onComplete);
 	}
 
+	/**
+	 * Set time offset only. Frame will not be set.
+	 * @param time Time.
+	 */
 	public inline function setTimeOnly(time: FastFloat) {
 		this.time = time;
 	}
 
+	/**
+	 * Set frame offset only. Time will not be set.
+	 * @param frame Frame
+	 */
 	public inline function setFrameOffsetOnly(frame: Int) {
 		this.offset = frame;
 	}
 
+	/**
+	 * Get raw bones data for bone animation.
+	 * @return Null<Array<TObj>> Raw bone action data.
+	 */
 	public inline function getBoneAction(): Null<Array<TObj>> {
 		return actionData;
 	}
 
+	/**
+	 * Get raw object data for object animation.
+	 * @return Null<TObj> Raw object action data.
+	 */
 	public inline function getObjectAction(): Null<TObj> {
 		if(actionData != null) return actionData[0];
 		return null;
 	}
 
+	/**
+	 * Cache raw bones data for bone animation.
+	 * @param actionData Raw bone data.
+	 */
 	public inline function setBoneAction(actionData: Array<TObj>) {
 		this.actionData = actionData;
 		this.totalFrames = actionData[0].anim.tracks[0].frames.length;
@@ -319,18 +417,30 @@ class ActionSampler {
 		actionDataInit = true;
 	}
 
+	/**
+	 * Cache raw object data for object animation.
+	 * @param actionData Raw object data.
+	 */
 	public inline function setObjectAction(actionData: TObj) {
 		this.actionData = [actionData];
 		this.totalFrames = actionData.anim.tracks[0].frames.length;
 		actionDataInit = true;
 	}
 
+	/**
+	 * Temporary cache of action matrix from previous frame.
+	 * @param m Matrix to cache.
+	 */
 	public inline function setActionCache(m: Mat4) {
 		if(! cacheSet) actionCache.setFrom(m);
 		cacheSet = true;
 		cacheInit = true;
 	}
 
+	/**
+	 * Copy cahced action matrix and to the matrix.
+	 * @param m Matrix to copy the cache to.
+	 */
 	public inline function getActionCache(m: Mat4) {
 		m.setFrom(actionCache);
 	}
